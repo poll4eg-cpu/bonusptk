@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <title>Калькулятор премий</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <!-- Иконки -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -24,7 +25,7 @@
     font-weight: 600;
     color: #444;
   }
-  input, select, button {
+  input, select, button, textarea {
     width: 100%;
     padding: 10px;
     margin-top: 6px;
@@ -70,19 +71,25 @@
     <h1>Калькулятор премий</h1>
     <label>Ваш рабочий номер телефона:</label>
     <input type="text" id="loginPhone" placeholder="+79123456789">
-    <button id="loginBtn" style="margin-top:15px;">Войти</button>
+    <button id="loginBtn" style="margin-top:15px; background:#1890ff; color:white; border:none;">
+      <i class="fas fa-sign-in-alt"></i> Войти
+    </button>
     <div id="loginError" style="color:red; margin-top:10px; display:none;"></div>
   </div>
 
   <!-- Экран 2: Ввод CRM ID -->
   <div id="crmScreen" style="display:none;">
-    <h2>Работа со сделкой</h2>
+    <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
     <label>Номер сделки в CRM (из Битрикс):</label>
     <input type="text" id="inputCrmId" placeholder="Например: 12345">
-    <button id="checkCrmBtn" style="margin-top:15px;">Найти / Создать</button>
+    <button id="checkCrmBtn" style="margin-top:15px; background:#52c41a; color:white; border:none;">
+      <i class="fas fa-search"></i> Найти / Создать
+    </button>
     <div id="crmError" style="color:red; margin-top:10px; display:none;"></div>
 
-    <button id="checkMonthBtn" style="margin-top:20px;">Посмотреть премию за месяц</button>
+    <button id="checkMonthBtn" style="margin-top:20px; background:#fa8c16; color:white; border:none;">
+      <i class="fas fa-calendar-check"></i> Посмотреть премию за месяц
+    </button>
     <div id="monthResult" class="result" style="display:none; margin-top:15px;"></div>
   </div>
 
@@ -90,6 +97,25 @@
   <div id="mainApp" style="display:none;">
     <div id="formContainer"></div>
   </div>
+
+  <!-- Форма обратной связи -->
+  <div style="margin: 30px 0; text-align: center;">
+    <button id="feedbackBtn" style="background:#f0f9ff; border:1px solid #91d5ff; padding:8px 16px; border-radius:6px; cursor:pointer; color:#1890ff;">
+      <i class="fas fa-comment"></i> Написать разработчику
+    </button>
+    <div id="feedbackForm" style="display:none; margin-top:15px; padding:15px; background:#fff; border:1px solid #ddd; border-radius:8px; max-width:500px; margin:15px auto;">
+      <textarea id="feedbackText" placeholder="Ваша идея, ошибка или пожелание..." style="width:100%; height:80px; margin-bottom:10px; padding:8px; border:1px solid #ccc; border-radius:4px;"></textarea>
+      <button id="sendFeedbackBtn" style="background:#1890ff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+        <i class="fas fa-paper-plane"></i> Отправить
+      </button>
+      <div id="feedbackResult" style="margin-top:10px; color:green; display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Подпись разработчика -->
+  <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 14px; font-family: 'Segoe UI', sans-serif;">
+    Разработчик — Илья Галунин
+  </footer>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -286,12 +312,50 @@ document.addEventListener('DOMContentLoaded', () => {
     resultDiv.style.display = 'block';
   });
 
+  // ✉️ Обратная связь
+  document.getElementById('feedbackBtn').addEventListener('click', () => {
+    const form = document.getElementById('feedbackForm');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.getElementById('sendFeedbackBtn').addEventListener('click', async () => {
+    const message = document.getElementById('feedbackText').value.trim();
+    if (!message || !currentUserPhone) {
+      alert('Введите сообщение');
+      return;
+    }
+
+    const { error } = await supabaseClient
+      .from('feedback')
+      .insert([{ 
+        phone: currentUserPhone, 
+        message, 
+        created_at: new Date().toISOString() 
+      }]);
+
+    if (error) {
+      console.error('Ошибка:', error);
+      alert('Не удалось отправить. Проверьте подключение.');
+    } else {
+      document.getElementById('feedbackResult').textContent = '✅ Спасибо! Ваше сообщение отправлено.';
+      document.getElementById('feedbackResult').style.display = 'block';
+      document.getElementById('feedbackText').value = '';
+      setTimeout(() => {
+        document.getElementById('feedbackForm').style.display = 'none';
+        document.getElementById('feedbackResult').style.display = 'none';
+      }, 2000);
+    }
+  });
+
   // ➕ Форма создания
   function showCreateForm(crmId) {
     document.getElementById('crmScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('formContainer').innerHTML = `
-      <h3>Создать сделку: ${crmId}</h3>
+      <button id="backBtn" style="margin-bottom:15px; background:#f5f5f5; border:1px solid #ddd; padding:6px 12px; border-radius:6px; cursor:pointer;">
+        <i class="fas fa-arrow-left"></i> Назад к CRM ID
+      </button>
+      <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
       <label>Ваше имя:</label>
       <input type="text" id="manager_name" placeholder="Иван Петров" required>
       <label>Сумма договора (₽):</label>
@@ -327,7 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="checkbox" id="up_signed"> 
         <label for="up_signed" style="display:inline;">УПД подписан?</label>
       </div>
-      <button id="createDealBtn" style="margin-top:20px;">Создать сделку</button>
+      <button id="createDealBtn" style="margin-top:20px; background:#52c41a; color:white; border:none;">
+        <i class="fas fa-save"></i> Создать сделку
+      </button>
       <div id="createFormResult" class="result" style="display:none;"></div>
     `;
 
@@ -412,7 +478,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('crmScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('formContainer').innerHTML = `
-      <h3>Обновить сделку: ${crm_id}</h3>
+      <button id="backBtn" style="margin-bottom:15px; background:#f5f5f5; border:1px solid #ddd; padding:6px 12px; border-radius:6px; cursor:pointer;">
+        <i class="fas fa-arrow-left"></i> Назад к CRM ID
+      </button>
+      <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
       <p><strong>Менеджер:</strong> ${manager_name}</p>
       <p><strong>Тип:</strong> ${deal_type === 'to' ? 'ТО' : deal_type}</p>
       <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
@@ -431,7 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <label for="update_up_signed" style="display:inline;">Отметить УПД как подписанный</label>
       </div>
 
-      <button id="updateDealBtn" style="margin-top:20px;">${paid ? 'Обновить УПД' : 'Добавить платёж'}</button>
+      <button id="updateDealBtn" style="margin-top:20px; background:#1890ff; color:white; border:none;">
+        ${paid ? '<i class="fas fa-file-signature"></i> Обновить УПД' : '<i class="fas fa-coins"></i> Добавить платёж'}
+      </button>
       <div id="updateFormResult" class="result" style="display:none;"></div>
     `;
 
@@ -491,15 +562,16 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('updateFormResult').style.display = 'block';
     });
   }
+
+  // 🔙 Кнопка "Назад" (делегирование события)
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'backBtn') {
+      document.getElementById('mainApp').style.display = 'none';
+      document.getElementById('crmScreen').style.display = 'block';
+      document.getElementById('monthResult').style.display = 'none';
+    }
+  });
 });
 </script>
-<footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 14px; font-family: 'Segoe UI', sans-serif;">
-Разработчик — Илья Галунин
-</footer>
 </body>
-
 </html>
-
-
-
-
