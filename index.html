@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <!-- Иконки -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href=" https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css ">
   <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultDiv.style.display = 'block';
   });
 
-  // ✉️ Обратная связь
+  // ✉️ Обратная связь — полная замена (без prompt!)
   document.getElementById('feedbackBtn').addEventListener('click', () => {
     const form = document.getElementById('feedbackForm');
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sendFeedbackBtn').addEventListener('click', async () => {
     const message = document.getElementById('feedbackText').value.trim();
     if (!message || !currentUserPhone) {
-      alert('Введите сообщение');
+      alert('Пожалуйста, введите сообщение');
       return;
     }
 
@@ -334,8 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }]);
 
     if (error) {
-      console.error('Ошибка:', error);
-      alert('Не удалось отправить. Проверьте подключение.');
+      console.error('Ошибка отправки:', error);
+      alert('Не удалось отправить сообщение. Попробуйте позже.');
     } else {
       document.getElementById('feedbackResult').textContent = '✅ Спасибо! Ваше сообщение отправлено.';
       document.getElementById('feedbackResult').style.display = 'block';
@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 🔙 Кнопка "Назад" (делегирование события)
+  // 🔙 Кнопка "Назад" — делегированная обработка
   document.addEventListener('click', (e) => {
     if (e.target.id === 'backBtn') {
       document.getElementById('mainApp').style.display = 'none';
