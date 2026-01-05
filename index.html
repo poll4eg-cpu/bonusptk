@@ -267,7 +267,14 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     return `
       <tr>
         <td>${deal.crm_id}</td>
-        <td>${deal.deal_type === 'to' ? 'ТО' : deal.deal_type.toUpperCase()}</td>
+        <td>${
+  deal.deal_type === 'to' ? 'ТО' :
+  deal.deal_type === 'pto' ? 'ПТО' :
+  deal.deal_type === 'eq' ? 'Оборудование' :
+  deal.deal_type === 'comp' ? 'Комплектующие' :
+  deal.deal_type === 'rep' ? 'Ремонты' :
+  deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
+}</td>
         <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
         <td>${status}</td>
         <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
@@ -582,3 +589,4 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
