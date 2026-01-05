@@ -5,7 +5,6 @@
   <title>Калькулятор премий</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <!-- Иконки -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
   body {
@@ -66,37 +65,18 @@
   </style>
 </head>
 <body>
-  // 👤 Авторизация
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('loginPhone').value.trim();
-  if (!phone) { alert('Введите номер телефона'); return; }
+  <!-- Экран 1: Авторизация -->
+  <div id="loginScreen">
+    <h1>Калькулятор премий</h1>
+    <label>Ваш рабочий номер телефона:</label>
+    <input type="text" id="loginPhone" placeholder="+79123456789">
+    <button id="loginBtn" style="margin-top:15px; background:#1890ff; color:white; border:none;">
+      <i class="fas fa-sign-in-alt"></i> Войти
+    </button>
+    <div id="loginError" style="color:red; margin-top:10px; display:none;"></div>
+  </div>
 
-  const { data, error } = await supabaseClient
-    .from('allowed_users')
-    .select('phone, name, role') // ← добавили role
-    .eq('phone', phone)
-    .single();
-
-  if (error || !data) {
-    document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
-
-  currentUserPhone = phone;
-  currentUserRole = data.role; // ← сохраняем роль
-
-  document.getElementById('loginScreen').style.display = 'none';
-  
-  // Показываем нужный экран
-  if (data.role === 'rop') {
-    document.getElementById('ropScreen').style.display = 'block';
-  } else {
-    document.getElementById('crmScreen').style.display = 'block';
-  }
-});
-
-  <!-- Экран 2: Ввод CRM ID + Обратная связь (только после входа) -->
+  <!-- Экран 2: Ввод CRM ID (менеджер) -->
   <div id="crmScreen" style="display:none;">
     <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
     <label>Номер сделки в CRM (из Битрикс):</label>
@@ -110,14 +90,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       <i class="fas fa-calendar-check"></i> Посмотреть премию за месяц
     </button>
     <div id="monthResult" class="result" style="display:none; margin-top:15px;"></div>
-    
-<!-- 🔹 НОВОЕ: Экран РОПа -->
-  <div id="ropScreen" style="display:none;">
-    <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
-    <p style="color:#888;">Интерфейс загружается...</p>
-  </div>
 
-    <!-- ✉️ Форма обратной связи — ТОЛЬКО ПОСЛЕ АВТОРИЗАЦИИ -->
+    <!-- ✉️ Форма обратной связи -->
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
       <button id="feedbackBtn" style="background:#f0f9ff; border:1px solid #91d5ff; padding:8px 16px; border-radius:6px; cursor:pointer; color:#1890ff;">
         <i class="fas fa-comment"></i> Написать разработчику
@@ -132,6 +106,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     </div>
   </div>
 
+  <!-- 🔹 Экран РОПа -->
+  <div id="ropScreen" style="display:none;">
+    <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
+    <p style="color:#888;">Интерфейс загружается...</p>
+  </div>
+
   <!-- Экран 3: Форма -->
   <div id="mainApp" style="display:none;">
     <div id="formContainer"></div>
@@ -144,12 +124,13 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // 🔑 Supabase
+  // 🔑 Supabase — БЕЗ ПРОБЕЛОВ!
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
   let currentUserPhone = null;
+  let currentUserRole = null; // ← роль пользователя
 
   // 📊 Расчёт премии
   function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -192,10 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!phone) { alert('Введите номер телефона'); return; }
 
     const { data, error } = await supabaseClient
-  .from('allowed_users')
-  .select('phone, name, role')
-  .eq('phone', phone)
-  .single();
+      .from('allowed_users')
+      .select('phone, name, role')
+      .eq('phone', phone)
+      .single();
 
     if (error || !data) {
       document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
@@ -204,15 +185,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     currentUserPhone = phone;
-    let currentUserRole = null;
-    currentUserRole = data.role; // ← добавьте эту переменную
-    if (data.role === 'rop') {
-  // Показать экран РОПа
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('ropScreen').style.display = 'block'; // ← новый экран
-} else {
+    currentUserRole = data.role;
+
     document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('crmScreen').style.display = 'block';
+    
+    if (data.role === 'rop') {
+      document.getElementById('ropScreen').style.display = 'block';
+    } else {
+      document.getElementById('crmScreen').style.display = 'block';
+    }
   });
 
   // 🔍 Проверка CRM ID
@@ -243,122 +224,121 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 📅 Премия за месяц — ИСПРАВЛЕННАЯ ВЕРСИЯ
-document.getElementById('checkMonthBtn').addEventListener('click', async () => {
-  // Получаем имя из allowed_users
-  const {  data, error: userError } = await supabaseClient
-    .from('allowed_users')
-    .select('name')
-    .eq('phone', currentUserPhone)
-    .single();
+  // 📅 Премия за месяц
+  document.getElementById('checkMonthBtn').addEventListener('click', async () => {
+    const {  data, error: userError } = await supabaseClient
+      .from('allowed_users')
+      .select('name')
+      .eq('phone', currentUserPhone)
+      .single();
 
-  if (userError) {
-    console.error('Ошибка получения имени:', userError);
-    alert('Ошибка авторизации. Обратитесь к администратору.');
-    return;
-  }
+    if (userError) {
+      console.error('Ошибка получения имени:', userError);
+      alert('Ошибка авторизации. Обратитесь к администратору.');
+      return;
+    }
 
-  if (!data || !data.name) {
-    alert('Ваше имя не указано в системе. Обратитесь к руководителю.');
-    return;
-  }
+    if (!data || !data.name) {
+      alert('Ваше имя не указано в системе. Обратитесь к руководителю.');
+      return;
+    }
 
-  const managerName = data.name;
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const managerName = data.name;
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  const {  data: deals, error: dealsError } = await supabaseClient
-    .from('deals')
-    .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
-    .eq('manager_name', managerName)
-    .gte('created_at', startOfMonth.toISOString())
-    .lte('created_at', endOfMonth.toISOString());
+    const {   deals, error: dealsError } = await supabaseClient
+      .from('deals')
+      .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
+      .eq('manager_name', managerName)
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
 
-  if (dealsError) {
-    console.error('Ошибка загрузки сделок:', dealsError);
-    alert('Ошибка: ' + dealsError.message);
-    return;
-  }
+    if (dealsError) {
+      console.error('Ошибка загрузки сделок:', dealsError);
+      alert('Ошибка: ' + dealsError.message);
+      return;
+    }
 
-  let totalMargin = 0;
-  let totalBonus = 0;
+    let totalMargin = 0;
+    let totalBonus = 0;
 
-  const dealRows = deals.map(deal => {
-    const margin = 
-      deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
-      deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
-      deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
-      deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
+    const dealRows = deals.map(deal => {
+      const margin = 
+        deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
+        deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
+        deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
+        deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
 
-    totalMargin += margin;
-    totalBonus += deal.bonus_paid || 0;
+      totalMargin += margin;
+      totalBonus += deal.bonus_paid || 0;
 
-    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+      const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
 
-    return `
-      <tr>
-        <td>${deal.crm_id}</td>
-        <td>${
-  deal.deal_type === 'to' ? 'ТО' :
-  deal.deal_type === 'pto' ? 'ПТО' :
-  deal.deal_type === 'eq' ? 'Оборудование' :
-  deal.deal_type === 'comp' ? 'Комплектующие' :
-  deal.deal_type === 'rep' ? 'Ремонты' :
-  deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
-}</td>
-        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-        <td>${status}</td>
-        <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
-        <td>${new Date(deal.created_at).toLocaleDateString('ru-RU')}</td>
-      </tr>
+      return `
+        <tr>
+          <td>${deal.crm_id}</td>
+          <td>${
+            deal.deal_type === 'to' ? 'ТО' :
+            deal.deal_type === 'pto' ? 'ПТО' :
+            deal.deal_type === 'eq' ? 'Оборудование' :
+            deal.deal_type === 'comp' ? 'Комплектующие' :
+            deal.deal_type === 'rep' ? 'Ремонты' :
+            deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
+          }</td>
+          <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+          <td>${status}</td>
+          <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
+          <td>${new Date(deal.created_at).toLocaleDateString('ru-RU')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const basePlan = 800000;
+    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+    const plan = basePlan * coefficients[now.getMonth()];
+    const planPercent = (totalMargin / plan) * 100;
+
+    let finalPayout = 0;
+    if (planPercent >= 100) {
+      finalPayout = totalBonus;
+    } else if (planPercent >= 50) {
+      finalPayout = Math.round(totalBonus * 0.5);
+    }
+
+    const resultDiv = document.getElementById('monthResult');
+    resultDiv.innerHTML = `
+      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+        <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+        <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+        <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+        <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+      </div>
+      <h4>Сделки (${deals.length} шт):</h4>
+      <div style="max-height:300px; overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>CRM ID</th>
+              <th>Тип</th>
+              <th>Договор</th>
+              <th>Оплата</th>
+              <th>Премия</th>
+              <th>Дата</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dealRows}
+          </tbody>
+        </table>
+      </div>
     `;
-  }).join('');
+    resultDiv.style.display = 'block';
+  });
 
-  const basePlan = 800000;
-  const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-  const plan = basePlan * coefficients[now.getMonth()];
-  const planPercent = (totalMargin / plan) * 100;
-
-  let finalPayout = 0;
-  if (planPercent >= 100) {
-    finalPayout = totalBonus;
-  } else if (planPercent >= 50) {
-    finalPayout = Math.round(totalBonus * 0.5);
-  }
-
-  const resultDiv = document.getElementById('monthResult');
-  resultDiv.innerHTML = `
-    <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-      <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-      <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-      <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-      <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
-    </div>
-    <h4>Сделки (${deals.length} шт):</h4>
-    <div style="max-height:300px; overflow:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>CRM ID</th>
-            <th>Тип</th>
-            <th>Договор</th>
-            <th>Оплата</th>
-            <th>Премия</th>
-            <th>Дата</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${dealRows}
-        </tbody>
-      </table>
-    </div>
-  `;
-  resultDiv.style.display = 'block';
-});
-
-  // ✉️ Обратная связь — ТОЛЬКО ПОСЛЕ АВТОРИЗАЦИИ
+  // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
     const form = document.getElementById('feedbackForm');
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
@@ -530,13 +510,13 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
       <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
       <p><strong>Менеджер:</strong> ${manager_name}</p>
       <p><strong>Тип:</strong> ${
-  deal_type === 'to' ? 'ТО' :
-  deal_type === 'pto' ? 'ПТО' :
-  deal_type === 'eq' ? 'Оборудование' :
-  deal_type === 'comp' ? 'Комплектующие' :
-  deal_type === 'rep' ? 'Ремонты' :
-  deal_type === 'rent' ? 'Аренда' : deal_type
-}</p>
+        deal_type === 'to' ? 'ТО' :
+        deal_type === 'pto' ? 'ПТО' :
+        deal_type === 'eq' ? 'Оборудование' :
+        deal_type === 'comp' ? 'Комплектующие' :
+        deal_type === 'rep' ? 'Ремонты' :
+        deal_type === 'rent' ? 'Аренда' : deal_type
+      }</p>
       <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
       <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
       <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
@@ -628,6 +608,3 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
-
-
-
