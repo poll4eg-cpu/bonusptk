@@ -497,7 +497,14 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
       </button>
       <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
       <p><strong>Менеджер:</strong> ${manager_name}</p>
-      <p><strong>Тип:</strong> ${deal_type === 'to' ? 'ТО' : deal_type}</p>
+      <p><strong>Тип:</strong> ${
+  deal_type === 'to' ? 'ТО' :
+  deal_type === 'pto' ? 'ПТО' :
+  deal_type === 'eq' ? 'Оборудование' :
+  deal_type === 'comp' ? 'Комплектующие' :
+  deal_type === 'rep' ? 'Ремонты' :
+  deal_type === 'rent' ? 'Аренда' : deal_type
+}</p>
       <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
       <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
       <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
@@ -589,4 +596,5 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
 
