@@ -639,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 📊 Загрузка данных РОПа
+  // 📊 Загрузка данных РОПа — ИСПРАВЛЕННАЯ
   async function loadRopData() {
     const period = document.getElementById('ropPeriod').value;
     const now = new Date();
@@ -664,18 +664,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     endDate.setHours(23, 59, 59, 999);
 
-    const {    deals, error } = await supabaseClient
+    // 👇 КОРРЕКТНЫЙ ЗАПРОС
+    const {   data, error } = await supabaseClient
       .from('deals')
       .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
 
-    if (error || !deals) {
-      alert('Нет данных за выбранный период или ошибка: ' + (error?.message || 'неизвестно'));
+    // 👇 ОБРАБОТКА ОШИБОК
+    if (error) {
+      console.error('Ошибка Supabase:', error);
+      alert('Ошибка загрузки данных: ' + error.message);
       document.getElementById('ropSummary').style.display = 'none';
       document.getElementById('ropDealsTable').style.display = 'none';
       return;
     }
+
+    if (!data) {
+      alert('Нет данных за выбранный период.');
+      document.getElementById('ropSummary').style.display = 'none';
+      document.getElementById('ropDealsTable').style.display = 'none';
+      return;
+    }
+
+    const deals = data;
+    console.log('Загружено сделок:', deals.length);
 
     let totalMargin = 0;
     deals.forEach(deal => {
