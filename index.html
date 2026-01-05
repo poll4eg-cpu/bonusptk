@@ -66,16 +66,35 @@
   </style>
 </head>
 <body>
-  <!-- Экран 1: Авторизация -->
-  <div id="loginScreen">
-    <h1>Калькулятор премий</h1>
-    <label>Ваш рабочий номер телефона:</label>
-    <input type="text" id="loginPhone" placeholder="+79123456789">
-    <button id="loginBtn" style="margin-top:15px; background:#1890ff; color:white; border:none;">
-      <i class="fas fa-sign-in-alt"></i> Войти
-    </button>
-    <div id="loginError" style="color:red; margin-top:10px; display:none;"></div>
-  </div>
+  // 👤 Авторизация
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { alert('Введите номер телефона'); return; }
+
+  const { data, error } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role') // ← добавили role
+    .eq('phone', phone)
+    .single();
+
+  if (error || !data) {
+    document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  currentUserPhone = phone;
+  currentUserRole = data.role; // ← сохраняем роль
+
+  document.getElementById('loginScreen').style.display = 'none';
+  
+  // Показываем нужный экран
+  if (data.role === 'rop') {
+    document.getElementById('ropScreen').style.display = 'block';
+  } else {
+    document.getElementById('crmScreen').style.display = 'block';
+  }
+});
 
   <!-- Экран 2: Ввод CRM ID + Обратная связь (только после входа) -->
   <div id="crmScreen" style="display:none;">
@@ -91,6 +110,12 @@
       <i class="fas fa-calendar-check"></i> Посмотреть премию за месяц
     </button>
     <div id="monthResult" class="result" style="display:none; margin-top:15px;"></div>
+    
+<!-- 🔹 НОВОЕ: Экран РОПа -->
+  <div id="ropScreen" style="display:none;">
+    <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
+    <p style="color:#888;">Интерфейс загружается...</p>
+  </div>
 
     <!-- ✉️ Форма обратной связи — ТОЛЬКО ПОСЛЕ АВТОРИЗАЦИИ -->
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
@@ -167,10 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!phone) { alert('Введите номер телефона'); return; }
 
     const { data, error } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name')
-      .eq('phone', phone)
-      .single();
+  .from('allowed_users')
+  .select('phone, name, role')
+  .eq('phone', phone)
+  .single();
 
     if (error || !data) {
       document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
@@ -179,6 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     currentUserPhone = phone;
+    let currentUserRole = null;
+    currentUserRole = data.role; // ← добавьте эту переменную
+    if (data.role === 'rop') {
+  // Показать экран РОПа
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('ropScreen').style.display = 'block'; // ← новый экран
+} else {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('crmScreen').style.display = 'block';
   });
@@ -596,5 +628,6 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
 
 
