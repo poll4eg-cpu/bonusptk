@@ -107,10 +107,53 @@
   </div>
 
   <!-- 🔹 Экран РОПа -->
-  <div id="ropScreen" style="display:none;">
-    <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
-    <p style="color:#888;">Интерфейс загружается...</p>
+<div id="ropScreen" style="display:none;">
+  <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
+  
+  <!-- Выбор периода -->
+  <div style="margin-bottom:20px;">
+    <label>Период:</label>
+    <select id="ropPeriod">
+      <option value="month">Текущий месяц</option>
+      <option value="week">Текущая неделя</option>
+      <option value="quarter">Текущий квартал</option>
+      <option value="year">Текущий год</option>
+    </select>
+    <button id="loadRopData" style="margin-left:10px; background:#1890ff; color:white; border:none; padding:6px 12px; border-radius:4px;">
+      Загрузить
+    </button>
   </div>
+
+  <!-- Итоги -->
+  <div id="ropSummary" class="result" style="display:none; text-align:left; padding:16px;">
+    <h3>Итоги за период</h3>
+    <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
+    <p><strong>Премия РОПа:</strong> <span id="ropBonus">0</span> ₽</p>
+    <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
+  </div>
+
+  <!-- Таблица сделок -->
+  <div id="ropDealsTable" style="margin-top:20px; display:none;">
+    <h3>Сделки отдела</h3>
+    <div style="max-height:500px; overflow:auto;">
+      <table id="ropDealsList" style="width:100%;">
+        <thead>
+          <tr>
+            <th>CRM ID</th>
+            <th>Менеджер</th>
+            <th>Тип</th>
+            <th>Договор</th>
+            <th>Маржа</th>
+            <th>Оплата</th>
+            <th>УПД</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="ropDealsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
   <!-- Экран 3: Форма -->
   <div id="mainApp" style="display:none;">
@@ -604,7 +647,216 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('monthResult').style.display = 'none';
     }
   });
+  // 📊 Загрузка данных РОПа
+async function loadRopData() {
+  const period = document.getElementById('ropPeriod').value;
+  const now = new Date();
+  
+  let startDate, endDate;
+  if (period === 'week') {
+    // Текущая неделя (Пн–Вс)
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startDate = new Date(now.setDate(diff));
+    endDate = new Date(now.setDate(startDate.getDate() + 6));
+  } else if (period === 'month') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (period === 'quarter') {
+    const quarter = Math.floor(now.getMonth() / 3);
+    startDate = new Date(now.getFullYear(), quarter * 3, 1);
+    endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+  } else if (period === 'year') {
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = new Date(now.getFullYear(), 11, 31);
+  }
+
+  // Устанавливаем время до конца дня
+  endDate.setHours(23, 59, 59, 999);
+
+  // Загружаем все сделки (без фильтра по менеджеру)
+  const {   deals, error } = await supabaseClient
+    .from('deals')
+    .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
+    .gte('created_at', startDate.toISOString())
+    .lte('created_at', endDate.toISOString());
+
+  if (error) {
+    alert('Ошибка загрузки данных: ' + error.message);
+    return;
+  }
+
+  // Расчёт итогов
+  let totalMargin = 0;
+  let totalDeals = deals.length;
+
+  deals.forEach(deal => {
+    totalMargin += deal.margin || 0;
+  });
+
+  // Премия РОПа: (маржа – НДС 22%) × 10%
+  const nds = totalMargin * 0.22;
+  const cleanMargin = totalMargin - nds;
+  const ropBonus = Math.round(cleanMargin * 0.10);
+
+  // Обновляем итоги
+  document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
+  document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
+  document.getElementById('totalDealsRop').textContent = totalDeals;
+
+  // Отображаем таблицу
+  document.getElementById('ropSummary').style.display = 'block';
+  document.getElementById('ropDealsTable').style.display = 'block';
+
+  // Заполняем таблицу
+  const tbody = document.getElementById('ropDealsBody');
+  tbody.innerHTML = '';
+
+  deals.forEach(deal => {
+    const row = document.createElement('tr');
+    
+    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+    const updStatus = deal.up_signed ? '✅' : '❌';
+    
+    const typeLabel = 
+      deal.deal_type === 'to' ? 'ТО' :
+      deal.deal_type === 'pto' ? 'ПТО' :
+      deal.deal_type === 'eq' ? 'Оборудование' :
+      deal.deal_type === 'comp' ? 'Комплектующие' :
+      deal.deal_type === 'rep' ? 'Ремонты' :
+      deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type;
+
+    row.innerHTML = `
+      <td>${deal.crm_id}</td>
+      <td>${deal.manager_name}</td>
+      <td>${typeLabel}</td>
+      <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+      <td>${(deal.margin || 0).toLocaleString('ru-RU')} ₽</td>
+      <td>${status}</td>
+      <td>${updStatus}</td>
+      <td>
+        <button class="editDealBtn" data-crm-id="${deal.crm_id}" style="background:#1890ff; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:14px;">
+          ✏️ Редакт.
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+// 🔄 Обработчик кнопки загрузки
+document.getElementById('loadRopData').addEventListener('click', loadRopData);
+
+// 🔄 Обработчик редактирования (делегирование)
+document.addEventListener('click', async (e) => {
+  if (e.target.classList.contains('editDealBtn')) {
+    const crmId = e.target.getAttribute('data-crm-id');
+    
+    // Загружаем данные сделки
+    const {  dealData } = await supabaseClient
+      .from('deals')
+      .select('*')
+      .eq('crm_id', crmId)
+      .single();
+
+    if (dealData) {
+      showRopUpdateForm(dealData);
+    }
+  }
+});
+
+// 🖊️ Форма редактирования для РОПа
+function showRopUpdateForm(deal) {
+  document.getElementById('ropScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  
+  const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
+  const remaining = contract_amount - total_paid;
+
+  document.getElementById('formContainer').innerHTML = `
+    <button id="backToRopBtn" style="margin-bottom:15px; background:#f5f5f5; border:1px solid #ddd; padding:6px 12px; border-radius:6px; cursor:pointer;">
+      <i class="fas fa-arrow-left"></i> Назад к панели РОПа
+    </button>
+    <h3><i class="fas fa-edit"></i> Редактировать сделку (РОП): ${crm_id}</h3>
+    <p><strong>Менеджер:</strong> ${manager_name}</p>
+    <p><strong>Тип:</strong> ${
+      deal_type === 'to' ? 'ТО' :
+      deal_type === 'pto' ? 'ПТО' :
+      deal_type === 'eq' ? 'Оборудование' :
+      deal_type === 'comp' ? 'Комплектующие' :
+      deal_type === 'rep' ? 'Ремонты' :
+      deal_type === 'rent' ? 'Аренда' : deal_type
+    }</p>
+    <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
+    <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
+    <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
+      <strong>Осталось оплатить:</strong> ${Math.max(0, remaining).toLocaleString('ru-RU')} ₽
+    </p>
+
+    <label>Новая сумма оплаты (₽):</label>
+    <input type="number" id="ropPaymentAmount" value="${total_paid}" placeholder="Например: 140000">
+
+    <div style="margin-top:15px;">
+      <input type="checkbox" id="ropPaid" ${paid ? 'checked' : ''}>
+      <label for="ropPaid" style="display:inline;">Оплачен полностью</label>
+    </div>
+
+    <div style="margin-top:10px;">
+      <input type="checkbox" id="ropUpdSigned" ${up_signed ? 'checked' : ''}>
+      <label for="ropUpdSigned" style="display:inline;">УПД подписан</label>
+    </div>
+
+    <button id="saveRopDealBtn" style="margin-top:20px; background:#52c41a; color:white; border:none; padding:10px 20px; border-radius:6px;">
+      <i class="fas fa-save"></i> Сохранить изменения
+    </button>
+    <div id="ropUpdateResult" class="result" style="display:none; margin-top:15px;"></div>
+  `;
+
+  // Сохранение изменений
+  document.getElementById('saveRopDealBtn').addEventListener('click', async () => {
+    const newPayment = parseFloat(document.getElementById('ropPaymentAmount').value) || total_paid;
+    const newPaid = document.getElementById('ropPaid').checked;
+    const newUpd = document.getElementById('ropUpdSigned').checked;
+
+    // Обновляем сделку
+    const { error } = await supabaseClient
+      .from('deals')
+      .update({
+        total_paid: newPayment,
+        paid: newPaid,
+        up_signed: newUpd,
+        updated_at: new Date().toISOString()
+      })
+      .eq('crm_id', crm_id);
+
+    if (error) {
+      alert('Ошибка сохранения: ' + error.message);
+      return;
+    }
+
+    // TODO: здесь можно добавить запись в deal_history
+
+    document.getElementById('ropUpdateResult').innerHTML = '✅ Изменения сохранены!';
+    document.getElementById('ropUpdateResult').style.display = 'block';
+
+    // Автоматически вернуться через 2 сек
+    setTimeout(() => {
+      document.getElementById('mainApp').style.display = 'none';
+      document.getElementById('ropScreen').style.display = 'block';
+      loadRopData(); // Обновить данные
+    }, 2000);
+  });
+}
+
+// 🔙 Кнопка "Назад к РОПу"
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'backToRopBtn') {
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
+  }
+});
 });
 </script>
 </body>
 </html>
+
