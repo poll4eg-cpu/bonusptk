@@ -7,305 +7,263 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
-  :root {
-    --primary: #1890ff;
-    --success: #52c41a;
-    --warning: #fa8c16;
-    --danger: #ff4d4f;
-    --bg: #f9f9f9;
-    --card: white;
-    --text: #333;
-    --border: #e8e8e8;
-    --text-light: #888;
-  }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-    background: var(--bg);
-    box-sizing: border-box;
-  }
-
-  .container {
-    max-width: 100%;
-    margin: 20px auto;
-    padding: 0 16px;
-    box-sizing: border-box;
-  }
-
-  h1, h2, h3, h4 {
-    color: var(--text);
-    margin-top: 0;
-    font-weight: 600;
-  }
-
-  label {
-    display: block;
-    margin-top: 12px;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  input, select, button, textarea {
-    width: 100%;
-    padding: 10px;
-    margin-top: 6px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-sizing: border-box;
-    font-size: 16px;
-    font-family: inherit;
-  }
-
-  input[type="checkbox"] {
-    width: auto;
-    margin-right: 8px;
-  }
-
-  .result {
-    margin-top: 24px;
-    padding: 16px;
-    background: #e6f7ff;
-    border: 1px solid #91d5ff;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    color: var(--primary);
-    display: none;
-  }
-
-  /* Карточки */
-  .card {
-    background: var(--card);
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    padding: 20px;
-    margin-bottom: 20px;
-    overflow: hidden;
-  }
-
-  /* Адаптивная таблица */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 12px;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  th, td {
-    padding: 8px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-    word-break: break-all;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  th {
-    background-color: #f0f9ff;
-    font-weight: 600;
-    font-size: 15px;
-  }
-
-  /* Мобильные стили */
-  @media (max-width: 768px) {
-    .container {
-      padding: 10px;
-    }
-    .card {
-      padding: 16px;
-    }
-    table {
-      font-size: 13px;
-    }
-    th, td {
-      padding: 6px;
-      font-size: 13px;
-    }
-    .filter-row {
-      flex-direction: column;
-      gap: 10px;
-    }
-    .analytics-card {
-      padding: 12px;
-    }
-    .analytics-item {
-      min-width: 100px;
-    }
-  }
-
-  /* Прогресс-бары */
-  .progress-bar {
-    height: 8px;
-    background: #e6f7ff;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 8px 0;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--success);
-    border-radius: 4px;
-  }
-
-  /* Кнопки */
-  button {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 16px;
-    font-weight: 500;
-  }
-
-  button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
-
-  button.success {
-    background: var(--success);
-  }
-
-  button.warning {
-    background: var(--warning);
-  }
-
-  button.danger {
-    background: var(--danger);
-  }
-
-  /* Скроллы */
-  .scrollable {
-    max-height: 400px;
-    overflow-y: auto;
-    margin-top: 12px;
-  }
-
-  /* Фильтры */
-  .filter-row {
-    display: flex;
-    gap: 12px;
-    margin: 15px 0;
-    flex-wrap: wrap;
-  }
-
-  .analytics-card {
-    background: #fafafa;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 12px 0;
-  }
-
-  .analytics-item {
-    flex: 1;
-    min-width: 120px;
-    background: #fff;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    text-align: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  }
-
-  .analytics-item .label {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 6px;
-  }
-
-  .analytics-item .value {
-    font-size: 18px;
-    font-weight: bold;
-    color: var(--primary);
-    margin: 6px 0;
-  }
-
-  .analytics-item .percent {
-    font-size: 13px;
-    color: var(--text-light);
-  }
-
-  /* Иконки в таблице */
-  .status-icon {
-    font-size: 16px;
-    margin: 0 4px;
-  }
-
-  .icon-success {
-    color: var(--success);
-  }
-
-  .icon-danger {
-    color: var(--danger);
-  }
-
-  /* Для мобильных устройств — убираем горизонтальный скролл */
-  .table-container {
-    overflow-x: hidden;
-    margin: 12px 0;
-  }
-
-  .table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 12px 0;
-  }
-
-  /* Убираем перенос текста */
-  .no-wrap {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Визуализация маржи */
-  .margin-value {
-    font-weight: 600;
-    color: var(--primary);
-  }
-
-  .segment-label {
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .manager-label {
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  /* Подпись разработчика */
-  footer {
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    text-align: center;
-    color: var(--text-light);
-    font-size: 14px;
-    font-family: 'Segoe UI', sans-serif;
-    background: var(--card);
-    padding: 12px;
-  }
-  </style>
+:root {
+--primary: #1890ff;
+--success: #52c41a;
+--warning: #fa8c16;
+--danger: #ff4d4f;
+--bg: #f9f9f9;
+--card: white;
+--text: #333;
+--border: #e8e8e8;
+--text-light: #888;
+}
+body {
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+max-width: 100%;
+margin: 0;
+padding: 0;
+background: var(--bg);
+box-sizing: border-box;
+}
+.container {
+max-width: 100%;
+margin: 20px auto;
+padding: 0 16px;
+box-sizing: border-box;
+}
+h1, h2, h3, h4 {
+color: var(--text);
+margin-top: 0;
+font-weight: 600;
+}
+label {
+display: block;
+margin-top: 12px;
+font-weight: 600;
+color: var(--text);
+}
+input, select, button, textarea {
+width: 100%;
+padding: 10px;
+margin-top: 6px;
+border: 1px solid var(--border);
+border-radius: 6px;
+box-sizing: border-box;
+font-size: 16px;
+font-family: inherit;
+}
+input[type="checkbox"] {
+width: auto;
+margin-right: 8px;
+}
+.result {
+margin-top: 24px;
+padding: 16px;
+background: #e6f7ff;
+border: 1px solid #91d5ff;
+border-radius: 8px;
+text-align: center;
+font-size: 18px;
+font-weight: bold;
+color: var(--primary);
+display: none;
+}
+.card {
+background: var(--card);
+border-radius: 12px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+padding: 20px;
+margin-bottom: 20px;
+overflow: hidden;
+}
+table {
+width: 100%;
+border-collapse: collapse;
+margin-top: 12px;
+font-size: 14px;
+line-height: 1.5;
+}
+th, td {
+padding: 8px;
+text-align: left;
+border-bottom: 1px solid var(--border);
+word-break: break-all;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+th {
+background-color: #f0f9ff;
+font-weight: 600;
+font-size: 15px;
+}
+@media (max-width: 768px) {
+.container {
+padding: 10px;
+}
+.card {
+padding: 16px;
+}
+table {
+font-size: 13px;
+}
+th, td {
+padding: 6px;
+font-size: 13px;
+}
+.filter-row {
+flex-direction: column;
+gap: 10px;
+}
+.analytics-card {
+padding: 12px;
+}
+.analytics-item {
+min-width: 100px;
+}
+}
+.progress-bar {
+height: 8px;
+background: #e6f7ff;
+border-radius: 4px;
+overflow: hidden;
+margin: 8px 0;
+}
+.progress-fill {
+height: 100%;
+background: var(--success);
+border-radius: 4px;
+}
+button {
+background: var(--primary);
+color: white;
+border: none;
+padding: 10px 16px;
+border-radius: 6px;
+cursor: pointer;
+transition: all 0.2s;
+font-size: 16px;
+font-weight: 500;
+}
+button:hover {
+opacity: 0.9;
+transform: translateY(-1px);
+}
+button.success {
+background: var(--success);
+}
+button.warning {
+background: var(--warning);
+}
+button.danger {
+background: var(--danger);
+}
+.scrollable {
+max-height: 400px;
+overflow-y: auto;
+margin-top: 12px;
+}
+.filter-row {
+display: flex;
+gap: 12px;
+margin: 15px 0;
+flex-wrap: wrap;
+}
+.analytics-card {
+background: #fafafa;
+border-radius: 8px;
+padding: 16px;
+margin: 12px 0;
+}
+.analytics-item {
+flex: 1;
+min-width: 120px;
+background: #fff;
+padding: 12px;
+border-radius: 8px;
+border: 1px solid var(--border);
+text-align: center;
+box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.analytics-item .label {
+font-weight: 600;
+font-size: 14px;
+margin-bottom: 6px;
+}
+.analytics-item .value {
+font-size: 18px;
+font-weight: bold;
+color: var(--primary);
+margin: 6px 0;
+}
+.analytics-item .percent {
+font-size: 13px;
+color: var(--text-light);
+}
+.status-icon {
+font-size: 16px;
+margin: 0 4px;
+}
+.icon-success {
+color: var(--success);
+}
+.icon-danger {
+color: var(--danger);
+}
+.table-container {
+overflow-x: hidden;
+margin: 12px 0;
+}
+.table-responsive {
+overflow-x: auto;
+-webkit-overflow-scrolling: touch;
+margin: 12px 0;
+}
+.no-wrap {
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+.margin-value {
+font-weight: 600;
+color: var(--primary);
+}
+.segment-label {
+font-weight: 600;
+color: var(--text);
+}
+.manager-label {
+font-weight: 600;
+color: var(--text);
+}
+footer {
+margin-top: 40px;
+padding-top: 20px;
+border-top: 1px solid var(--border);
+text-align: center;
+color: var(--text-light);
+font-size: 14px;
+font-family: 'Segoe UI', sans-serif;
+background: var(--card);
+padding: 12px;
+}
+</style>
 </head>
 <body>
   <div class="container">
-
     <!-- Экран 1: Авторизация -->
     <div id="loginScreen" class="card">
       <h1>Калькулятор премий</h1>
       <label>Ваш рабочий номер телефона:</label>
       <input type="text" id="loginPhone" placeholder="+79123456789">
+      
+      <!-- Поле пароля появится, если это РОП -->
+      <div id="passwordField" style="display:none; margin-top:12px;">
+        <label>Пароль (для РОПа):</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      
       <button id="loginBtn">Войти</button>
       <div id="loginError" style="color:var(--danger); margin-top:10px; display:none;"></div>
     </div>
@@ -338,7 +296,6 @@
     <div id="ropScreen" class="card" style="display:none;">
       <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
       
-      <!-- Выбор периода -->
       <div class="filter-row">
         <div style="flex:1; min-width:150px;">
           <label>Период:</label>
@@ -355,10 +312,8 @@
         </div>
       </div>
 
-      <!-- Кнопка создания сделки -->
       <button id="ropCreateDealBtn" class="success" style="margin-top:15px; width:100%;">Создать сделку</button>
 
-      <!-- Итоги -->
       <div id="ropSummary" class="result" style="display:none; text-align:left; padding:16px;">
         <h3>Итоги за период</h3>
         <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
@@ -366,7 +321,6 @@
         <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
       </div>
 
-      <!-- Фильтры -->
       <div class="filter-row">
         <div style="flex:1; min-width:150px;">
           <label>Менеджер:</label>
@@ -392,19 +346,16 @@
         </div>
       </div>
 
-      <!-- Аналитика по менеджерам -->
       <div id="managersAnalytics" class="analytics-card" style="display:none;">
         <h4>Топ менеджеров</h4>
         <div id="managersChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
       </div>
 
-      <!-- Аналитика по сегментам -->
       <div id="segmentsAnalytics" class="analytics-card" style="display:none;">
         <h4>Маржа по сегментам</h4>
         <div id="segmentsChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
       </div>
 
-      <!-- Таблица сделок -->
       <div id="ropDealsTable" style="margin-top:20px; display:none;">
         <h3>Сделки отдела</h3>
         <div class="table-container">
@@ -427,21 +378,17 @@
       </div>
     </div>
 
-    <!-- Экран 3: Форма -->
     <div id="mainApp" style="display:none;">
       <div id="formContainer"></div>
     </div>
 
-    <!-- Подпись разработчика -->
     <footer>
       Разработчик — Илья Галунин
     </footer>
-
   </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // 🔑 Supabase
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -449,13 +396,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUserPhone = null;
   let currentUserRole = null;
 
-  // 📊 Расчёт премии
   function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
     if (!paid || !upSigned) return 0;
     if (dealType === 'to') {
-      if (annualContract && revenue >= 35000) {
-        return Math.round(revenue * 12 * 0.03);
-      }
+      if (annualContract && revenue >= 35000) return Math.round(revenue * 12 * 0.03);
       if (isFirst) {
         if (revenue >= 70000) return 6000;
         if (revenue >= 35000) return 3000;
@@ -475,38 +419,54 @@ document.addEventListener('DOMContentLoaded', () => {
       if (revenue >= 300000) return Math.round(revenue * 0.01);
       return Math.round(revenue * 0.03);
     }
-    if (dealType === 'eq') {
-      return Math.round(revenue * 0.01);
-    }
-    if (dealType === 'rent') {
-      return 1500;
-    }
+    if (dealType === 'eq') return Math.round(revenue * 0.01);
+    if (dealType === 'rent') return 1500;
     return 0;
   }
 
-  // 👤 Авторизация
+  // 👤 Авторизация с паролем для РОПа
   document.getElementById('loginBtn').addEventListener('click', async () => {
     const phone = document.getElementById('loginPhone').value.trim();
     if (!phone) { alert('Введите номер телефона'); return; }
 
-    const { data, error } = await supabaseClient
+    const {  user, error: fetchError } = await supabaseClient
       .from('allowed_users')
-      .select('phone, name, role')
+      .select('phone, name, role, password')
       .eq('phone', phone)
       .single();
 
-    if (error || !data) {
-      document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
+    if (fetchError || !user) {
+      document.getElementById('loginError').textContent = 'Номер не найден.';
       document.getElementById('loginError').style.display = 'block';
       return;
     }
 
-    currentUserPhone = phone;
-    currentUserRole = data.role;
+    // Если РОП — запрашиваем пароль
+    if (user.role === 'rop') {
+      const passwordField = document.getElementById('passwordField');
+      if (passwordField.style.display !== 'block') {
+        passwordField.style.display = 'block';
+        document.getElementById('loginPassword').focus();
+        document.getElementById('loginBtn').textContent = 'Войти с паролем';
+        return;
+      }
 
+      const password = document.getElementById('loginPassword').value.trim();
+      if (!password) { alert('Введите пароль'); return; }
+
+      if (password !== user.password) {
+        document.getElementById('loginError').textContent = 'Неверный пароль.';
+        document.getElementById('loginError').style.display = 'block';
+        return;
+      }
+    }
+
+    // Вход успешен
+    currentUserPhone = phone;
+    currentUserRole = user.role;
     document.getElementById('loginScreen').style.display = 'none';
     
-    if (data.role === 'rop') {
+    if (user.role === 'rop') {
       document.getElementById('ropScreen').style.display = 'block';
     } else {
       document.getElementById('crmScreen').style.display = 'block';
@@ -582,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalBonus = 0;
 
     const dealRows = deals.map(deal => {
-      const margin = 
+      const margin =
         deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
         deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
         deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
@@ -672,8 +632,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .from('feedback')
       .insert([{ 
         phone: currentUserPhone, 
-        message, 
-        created_at: new Date().toISOString() 
+        message,
+        created_at: new Date().toISOString()
       }]);
 
     if (error) {
@@ -1294,20 +1254,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 🔙 Универсальный обработчик кнопок
   document.addEventListener('click', (e) => {
-    // Кнопка "Назад" (менеджер)
     if (e.target.id === 'backBtn') {
       document.getElementById('mainApp').style.display = 'none';
       document.getElementById('crmScreen').style.display = 'block';
       document.getElementById('monthResult').style.display = 'none';
     }
     
-    // Кнопка "Назад к РОПу"
     if (e.target.id === 'backToRopBtn') {
       document.getElementById('mainApp').style.display = 'none';
       document.getElementById('ropScreen').style.display = 'block';
     }
     
-    // Кнопка "Редактировать" (РОП)
     if (e.target.classList.contains('editDealBtn')) {
       const crmId = e.target.getAttribute('data-crm-id');
       
