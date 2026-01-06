@@ -486,34 +486,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
-  // 👤 Авторизация
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const phone = document.getElementById('loginPhone').value.trim();
-    if (!phone) { alert('Введите номер телефона'); return; }
+ // 👤 Авторизация
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
 
-    const { data, error } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name, role')
-      .eq('phone', phone)
-      .single();
+  if (!phone || !password) {
+    document.getElementById('loginError').textContent = 'Введите номер телефона и пароль';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
 
-    if (error || !data) {
-      document.getElementById('loginError').textContent = 'Номер не найден. Обратитесь к руководителю.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
+  const { data, error } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role')
+    .eq('phone', phone)
+    .eq('password', password)
+    .single();
 
-    currentUserPhone = phone;
-    currentUserRole = data.role;
+  if (error || !data) {
+    document.getElementById('loginError').textContent = 'Неверный номер или пароль';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
 
-    document.getElementById('loginScreen').style.display = 'none';
-    
-    if (data.role === 'rop') {
-      document.getElementById('ropScreen').style.display = 'block';
-    } else {
-      document.getElementById('crmScreen').style.display = 'block';
-    }
-  });
+  currentUserPhone = phone;
+  currentUserRole = data.role;
+  document.getElementById('loginScreen').style.display = 'none';
+
+  if (data.role === 'rop') {
+    document.getElementById('ropScreen').style.display = 'block';
+  } else {
+    document.getElementById('crmScreen').style.display = 'block';
+  }
+});
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -1361,4 +1367,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
 
