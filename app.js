@@ -61,7 +61,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   currentUserName = data.name;
   document.getElementById('loginScreen').classList.add('hidden');
   if (data.role === 'rop') {
-    document.getElementById('ropScreen').classList.remove('hidden');
+    // Для теста пока не показываем РОПа
+    document.getElementById('crmScreen').classList.remove('hidden');
   } else {
     document.getElementById('crmScreen').classList.remove('hidden');
   }
@@ -221,7 +222,7 @@ document.getElementById('sendFeedbackBtn').addEventListener('click', async () =>
   }
 });
 
-// ➕ Форма создания (менеджер) - ИСПРАВЛЕНО
+// ➕ Форма создания (менеджер)
 function showCreateForm(crmId) {
   document.getElementById('crmScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
@@ -274,17 +275,6 @@ function showCreateForm(crmId) {
   });
   document.getElementById('deal_type').dispatchEvent(new Event('change'));
   document.getElementById('createDealBtn').addEventListener('click', async () => {
-    // Проверка на дубликат
-    const { data: existingDeal } = await supabaseClient
-      .from('deals')
-      .select('*')
-      .eq('crm_id', crmId)
-      .single();
-    if (existingDeal) {
-      alert(`Сделка с CRM ID ${crmId} уже существует.`);
-      return;
-    }
-
     const managerName = currentUserName;
     const contractAmount = parseFloat(document.getElementById('contract_amount').value);
     const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
@@ -331,7 +321,7 @@ function showCreateForm(crmId) {
         bonus_paid: bonusPaid
       }]);
     if (error) {
-      if (error.code === '23505') { // duplicate key
+      if (error.code === '23505') {
         alert(`Сделка с CRM ID ${crmId} уже существует.`);
       } else {
         alert('Ошибка сохранения: ' + error.message);
@@ -430,346 +420,6 @@ function showUpdateForm(deal) {
   });
 }
 
-// 📊 Загрузка данных РОПа
-async function loadRopData() {
-  const period = document.getElementById('ropPeriod').value;
-  const now = new Date();
-  let startDate, endDate;
-  if (period === 'week') {
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    startDate = new Date(now.setDate(diff));
-    endDate = new Date(now.setDate(startDate.getDate() + 6));
-  } else if (period === 'month') {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  } else if (period === 'quarter') {
-    const quarter = Math.floor(now.getMonth() / 3);
-    startDate = new Date(now.getFullYear(), quarter * 3, 1);
-    endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
-  } else if (period === 'year') {
-    startDate = new Date(now.getFullYear(), 0, 1);
-    endDate = new Date(now.getFullYear(), 11, 31);
-  }
-  endDate.setHours(23, 59, 59, 999);
-  const { data, error } = await supabaseClient
-    .from('deals')
-    .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
-    .gte('created_at', startDate.toISOString())
-    .lte('created_at', endDate.toISOString());
-  if (error) {
-    alert('Ошибка загрузки данных: ' + error.message);
-    return;
-  }
-  const allDeals = data || [];
-  // Заполнение фильтра менеджерами
-  const managerSet = new Set(allDeals.map(d => d.manager_name));
-  const managerSelect = document.getElementById('ropManagerFilter');
-  managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
-  managerSet.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    managerSelect.appendChild(opt);
-  });
-  // Применение фильтров
-  const managerFilter = document.getElementById('ropManagerFilter').value;
-  const segmentFilter = document.getElementById('ropSegmentFilter').value;
-  let deals = allDeals;
-  if (managerFilter) deals = deals.filter(d => d.manager_name === managerFilter);
-  if (segmentFilter) {
-    const typeMap = {
-      'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
-      'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent'
-    };
-    const dealType = typeMap[segmentFilter];
-    deals = deals.filter(d => d.deal_type === dealType);
-  }
-  // Итоги
-  let totalMargin = deals.reduce((sum, d) => sum + (d.margin || 0), 0);
-  const cleanMargin = totalMargin * 0.78;
-  const ropBonus = Math.round(cleanMargin * 0.10);
-  document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
-  document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
-  document.getElementById('totalDealsRop').textContent = deals.length;
-  document.getElementById('ropSummary').classList.remove('hidden');
-  document.getElementById('ropDealsTable').classList.remove('hidden');
-  // Аналитика по менеджерам
-  const managers = {};
-  deals.forEach(d => managers[d.manager_name] = (managers[d.manager_name] || 0) + (d.margin || 0));
-  const managersList = document.getElementById('managersChart');
-  managersList.innerHTML = '';
-  Object.entries(managers)
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([name, margin]) => {
-      const percent = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
-      managersList.innerHTML += `
-        <div class="analytics-item">
-          <div class="manager-label">${name}</div>
-          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${percent}%</div>
-        </div>
-      `;
-    });
-  document.getElementById('managersAnalytics').classList.remove('hidden');
-  // Аналитика по сегментам
-  const segments = {};
-  const labels = { 'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование', 'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда' };
-  deals.forEach(d => {
-    const label = labels[d.deal_type] || d.deal_type;
-    segments[label] = (segments[label] || 0) + (d.margin || 0);
-  });
-  const segmentsList = document.getElementById('segmentsChart');
-  segmentsList.innerHTML = '';
-  Object.entries(segments)
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([name, margin]) => {
-      const percent = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
-      segmentsList.innerHTML += `
-        <div class="analytics-item">
-          <div class="segment-label">${name}</div>
-          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${percent}%</div>
-        </div>
-      `;
-    });
-  document.getElementById('segmentsAnalytics').classList.remove('hidden');
-  // Таблица сделок
-  const tbody = document.getElementById('ropDealsBody');
-  tbody.innerHTML = '';
-  deals.forEach(deal => {
-    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
-    const updStatus = deal.up_signed ? '<span class="status-icon icon-success">✔️</span>' : '<span class="status-icon icon-danger">✖️</span>';
-    const typeLabel =
-      deal.deal_type === 'to' ? 'ТО' :
-      deal.deal_type === 'pto' ? 'ПТО' :
-      deal.deal_type === 'eq' ? 'Оборудование' :
-      deal.deal_type === 'comp' ? 'Комплектующие' :
-      deal.deal_type === 'rep' ? 'Ремонты' :
-      deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type;
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td class="no-wrap">${deal.crm_id}</td>
-      <td class="no-wrap">${deal.manager_name}</td>
-      <td class="no-wrap">${typeLabel}</td>
-      <td class="no-wrap">${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-      <td class="no-wrap"><span class="margin-value">${(deal.margin || 0).toLocaleString('ru-RU')} ₽</span></td>
-      <td class="no-wrap">${status}</td>
-      <td class="no-wrap">${updStatus}</td>
-      <td>
-        <button class="editDealBtn" data-crm-id="${deal.crm_id}" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:14px;">
-          ✏️ Редакт.
-        </button>
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
-}
-
-// ➕ Создание сделки от РОПа
-document.getElementById('ropCreateDealBtn').addEventListener('click', () => {
-  const crmId = prompt('Введите номер сделки из CRM:');
-  if (crmId) showRopCreateForm(crmId.trim());
-});
-
-function showRopCreateForm(crmId) {
-  document.getElementById('ropScreen').classList.add('hidden');
-  document.getElementById('mainApp').classList.remove('hidden');
-  document.getElementById('formContainer').innerHTML = `
-    <button id="backToRopBtn" style="margin-bottom:15px; background:#f5f5f5; border:1px solid #ddd; padding:6px 12px; border-radius:6px; cursor:pointer;">
-      <i class="fas fa-arrow-left"></i> Назад к панели РОПа
-    </button>
-    <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
-    <label>Менеджер:</label>
-    <select id="ropManagerName">
-      <option value="">Выберите менеджера</option>
-    </select>
-    <label>Сумма договора (₽):</label>
-    <input type="number" id="ropContractAmount" placeholder="600000" required>
-    <label>Сумма предоплаты (₽):</label>
-    <input type="number" id="ropPaymentAmount" placeholder="140000" required>
-    <label>Тип сделки:</label>
-    <select id="ropDealType">
-      <option value="to">ТО</option>
-      <option value="pto">ПТО</option>
-      <option value="comp">Комплектующие</option>
-      <option value="rep">Ремонты</option>
-      <option value="eq">Оборудование</option>
-      <option value="rent">Аренда</option>
-    </select>
-    <div id="ropArpuSection" style="display:none;">
-      <label>ARPU (₽/мес):</label>
-      <input type="number" id="ropArpu" placeholder="46666">
-    </div>
-    <div id="ropAnnualSection" style="display:none; margin-top:10px;">
-      <input type="checkbox" id="ropAnnualContract">
-      <label for="ropAnnualContract" style="display:inline;">Годовой контракт</label>
-    </div>
-    <div style="margin-top:15px;">
-      <input type="checkbox" id="ropIsFirst">
-      <label for="ropIsFirst" style="display:inline;">Первый платёж (ТО)?</label>
-    </div>
-    <div style="margin-top:10px;">
-      <input type="checkbox" id="ropPaid">
-      <label for="ropPaid" style="display:inline;">Оплачен?</label>
-    </div>
-    <div style="margin-top:10px;">
-      <input type="checkbox" id="ropUpdSigned">
-      <label for="ropUpdSigned" style="display:inline;">УПД подписан?</label>
-    </div>
-    <button id="ropCreateDealBtn" class="success">Создать сделку</button>
-    <div id="ropCreateFormResult" class="result hidden"></div>
-  `;
-  // Загрузка списка менеджеров
-  supabaseClient
-    .from('allowed_users')
-    .select('name')
-    .eq('role', 'manager')
-    .then(({ data, error }) => {
-      if (!error && data) {
-        const select = document.getElementById('ropManagerName');
-        data.forEach(user => {
-          const option = document.createElement('option');
-          option.value = user.name;
-          option.textContent = user.name;
-          select.appendChild(option);
-        });
-      }
-    });
-  document.getElementById('ropDealType').addEventListener('change', () => {
-    const isTO = document.getElementById('ropDealType').value === 'to';
-    document.getElementById('ropArpuSection').style.display = isTO ? 'block' : 'none';
-    document.getElementById('ropAnnualSection').style.display = isTO ? 'block' : 'none';
-  });
-  document.getElementById('ropDealType').dispatchEvent(new Event('change'));
-  document.getElementById('ropCreateDealBtn').addEventListener('click', async () => {
-    const managerName = document.getElementById('ropManagerName').value;
-    const contractAmount = parseFloat(document.getElementById('ropContractAmount').value);
-    const paymentAmount = parseFloat(document.getElementById('ropPaymentAmount').value);
-    const dealType = document.getElementById('ropDealType').value;
-    const arpuInput = document.getElementById('ropArpu').value;
-    const annualContract = document.getElementById('ropAnnualContract').checked;
-    const isFirst = document.getElementById('ropIsFirst').checked;
-    const paid = document.getElementById('ropPaid').checked;
-    const upSigned = document.getElementById('ropUpdSigned').checked;
-    if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-      alert('Заполните все поля');
-      return;
-    }
-    const totalPaid = paymentAmount;
-    const isFullyPaid = totalPaid >= contractAmount;
-    let bonusPaid = 0;
-    if (isFullyPaid) {
-      let revenueForBonus = contractAmount;
-      if (dealType === 'to') {
-        const arpuValue = arpuInput ? parseFloat(arpuInput) : contractAmount / 12;
-        revenueForBonus = arpuValue;
-      }
-      bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, annualContract);
-    }
-    const margin =
-      dealType === 'to' || dealType === 'pto' || dealType === 'rent' ? contractAmount * 0.7 :
-      dealType === 'eq' ? contractAmount * 0.2 :
-      dealType === 'comp' ? contractAmount * 0.3 :
-      dealType === 'rep' ? contractAmount * 0.4 : 0;
-    const { error } = await supabaseClient
-      .from('deals')
-      .insert([{
-        crm_id: crmId,
-        manager_name: managerName,
-        deal_type: dealType,
-        contract_amount: contractAmount,
-        total_paid: totalPaid,
-        paid: isFullyPaid,
-        up_signed: upSigned,
-        is_first: isFirst,
-        arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
-        annual_contract: annualContract,
-        margin: margin,
-        bonus_paid: bonusPaid
-      }]);
-    if (error) {
-      if (error.code === '23505') {
-        alert(`Сделка с CRM ID ${crmId} уже существует.`);
-      } else {
-        alert('Ошибка: ' + error.message);
-      }
-      return;
-    }
-    document.getElementById('ropCreateFormResult').textContent = '✅ Сделка создана!';
-    document.getElementById('ropCreateFormResult').classList.remove('hidden');
-    setTimeout(() => {
-      document.getElementById('mainApp').classList.add('hidden');
-      document.getElementById('ropScreen').classList.remove('hidden');
-      loadRopData();
-    }, 2000);
-  });
-}
-
-function showRopUpdateForm(deal) {
-  document.getElementById('ropScreen').classList.add('hidden');
-  document.getElementById('mainApp').classList.remove('hidden');
-  const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
-  const remaining = contract_amount - total_paid;
-  document.getElementById('formContainer').innerHTML = `
-    <button id="backToRopBtn" style="margin-bottom:15px; background:#f5f5f5; border:1px solid #ddd; padding:6px 12px; border-radius:6px; cursor:pointer;">
-      <i class="fas fa-arrow-left"></i> Назад к панели РОПа
-    </button>
-    <h3><i class="fas fa-edit"></i> Редактировать сделку (РОП): ${crm_id}</h3>
-    <p><strong>Менеджер:</strong> ${manager_name}</p>
-    <p><strong>Тип:</strong> ${
-    deal_type === 'to' ? 'ТО' :
-    deal_type === 'pto' ? 'ПТО' :
-    deal_type === 'eq' ? 'Оборудование' :
-    deal_type === 'comp' ? 'Комплектующие' :
-    deal_type === 'rep' ? 'Ремонты' :
-    deal_type === 'rent' ? 'Аренда' : deal_type
-  }</p>
-    <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
-    <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
-    <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
-      <strong>Осталось оплатить:</strong> ${Math.max(0, remaining).toLocaleString('ru-RU')} ₽
-    </p>
-    <label>Новая сумма оплаты (₽):</label>
-    <input type="number" id="ropPaymentAmount" value="${total_paid}" placeholder="Например: 140000">
-    <div style="margin-top:15px;">
-      <input type="checkbox" id="ropPaid" ${paid ? 'checked' : ''}>
-      <label for="ropPaid" style="display:inline;">Оплачен полностью</label>
-    </div>
-    <div style="margin-top:10px;">
-      <input type="checkbox" id="ropUpdSigned" ${up_signed ? 'checked' : ''}>
-      <label for="ropUpdSigned" style="display:inline;">УПД подписан</label>
-    </div>
-    <button id="saveRopDealBtn" class="success">Сохранить изменения</button>
-    <div id="ropUpdateResult" class="result hidden" style="margin-top:15px;"></div>
-  `;
-  document.getElementById('saveRopDealBtn').addEventListener('click', async () => {
-    const newPayment = parseFloat(document.getElementById('ropPaymentAmount').value) || total_paid;
-    const newPaid = document.getElementById('ropPaid').checked;
-    const newUpd = document.getElementById('ropUpdSigned').checked;
-    const { error } = await supabaseClient
-      .from('deals')
-      .update({
-        total_paid: newPayment,
-        paid: newPaid,
-        up_signed: newUpd,
-        updated_at: new Date().toISOString()
-      })
-      .eq('crm_id', crm_id);
-    if (error) {
-      alert('Ошибка сохранения: ' + error.message);
-      return;
-    }
-    document.getElementById('ropUpdateResult').textContent = '✅ Изменения сохранены!';
-    document.getElementById('ropUpdateResult').classList.remove('hidden');
-    setTimeout(() => {
-      document.getElementById('mainApp').classList.add('hidden');
-      document.getElementById('ropScreen').classList.remove('hidden');
-      loadRopData();
-    }, 2000);
-  });
-}
-
 // 🔙 Обработчики кнопок
 document.addEventListener('click', (e) => {
   if (e.target.id === 'backBtn') {
@@ -791,7 +441,3 @@ document.addEventListener('click', (e) => {
       });
   }
 });
-
-// 🔄 Кнопки РОПа
-document.getElementById('loadRopData').addEventListener('click', loadRopData);
-document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
