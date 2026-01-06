@@ -257,14 +257,11 @@ padding: 12px;
       <h1>Калькулятор премий</h1>
       <label>Ваш рабочий номер телефона:</label>
       <input type="text" id="loginPhone" placeholder="+79123456789">
-      <!-- Поле пароля появится, если это РОП -->
-      <div id="passwordField" style="display:none; margin-top:12px;">
-        <label>Пароль (для РОПа):</label>
-        <input type="password" id="loginPassword" placeholder="••••••••">
-      </div>
-      <button id="loginBtn">Войти</button>
-      <div id="loginError" style="color:var(--danger); margin-top:10px; display:none;"></div>
-    </div>
+     <!-- Поле пароля появится, если это РОП -->
+<div id="passwordField" style="display:none; margin-top:12px;">
+  <label>Пароль (для РОПа):</label>
+  <input type="password" id="loginPassword" placeholder="••••••••">
+</div>
 
     <!-- Экран 2: Ввод CRM ID (менеджер) -->
     <div id="crmScreen" class="card" style="display:none;">
@@ -423,49 +420,59 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 👤 Авторизация с паролем для РОПа
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const phone = document.getElementById('loginPhone').value.trim();
-    if (!phone) { alert('Введите номер телефона'); return; }
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { 
+    alert('Введите номер телефона'); 
+    return; 
+  }
 
-    const {  user, error: fetchError } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name, role, password')
-      .eq('phone', phone)
-      .single();
+  const {  user, error: fetchError } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role, password')
+    .eq('phone', phone)
+    .single();
 
-    if (fetchError || !user) {
-      document.getElementById('loginError').textContent = 'Номер не найден.';
-      document.getElementById('loginError').style.display = 'block';
+  if (fetchError || !user) {
+    document.getElementById('loginError').textContent = 'Номер не найден.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  // Если РОП — показываем поле пароля
+  if (user.role === 'rop') {
+    const passwordField = document.getElementById('passwordField');
+    if (passwordField.style.display !== 'block') {
+      passwordField.style.display = 'block';
+      document.getElementById('loginPassword').focus();
+      document.getElementById('loginBtn').textContent = 'Войти с паролем';
       return;
     }
 
-    if (user.role === 'rop') {
-      const passwordField = document.getElementById('passwordField');
-      if (passwordField.style.display !== 'block') {
-        passwordField.style.display = 'block';
-        document.getElementById('loginPassword').focus();
-        document.getElementById('loginBtn').textContent = 'Войти с паролем';
-        return;
-      }
-
-      const password = document.getElementById('loginPassword').value.trim();
-      if (!password) { alert('Введите пароль'); return; }
-      if (password !== user.password) {
-        document.getElementById('loginError').textContent = 'Неверный пароль.';
-        document.getElementById('loginError').style.display = 'block';
-        return;
-      }
+    // Проверяем пароль
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!password) {
+      alert('Введите пароль');
+      return;
     }
 
-    currentUserPhone = phone;
-    currentUserRole = user.role;
-    document.getElementById('loginScreen').style.display = 'none';
-    if (user.role === 'rop') {
-      document.getElementById('ropScreen').style.display = 'block';
-    } else {
-      document.getElementById('crmScreen').style.display = 'block';
+    if (password !== user.password) {
+      document.getElementById('loginError').textContent = 'Неверный пароль.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
     }
-  });
+  }
+
+  // Успешный вход
+  currentUserPhone = phone;
+  currentUserRole = user.role;
+  document.getElementById('loginScreen').style.display = 'none';
+  if (user.role === 'rop') {
+    document.getElementById('ropScreen').style.display = 'block';
+  } else {
+    document.getElementById('crmScreen').style.display = 'block';
+  }
+});
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -1242,3 +1249,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
