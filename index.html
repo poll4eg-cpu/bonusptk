@@ -407,44 +407,54 @@ return 0;
 }
 // 👤 Авторизация с паролем для РОПа
 document.getElementById('loginBtn').addEventListener('click', async () => {
-const phone = document.getElementById('loginPhone').value.trim();
-if (!phone) { alert('Введите номер телефона'); return; }
-const {  user, error: fetchError } = await supabaseClient
-.from('allowed_users')
-.select('phone, name, role, password')
-.eq('phone', phone)
-.single();
-if (fetchError || !user) {
-document.getElementById('loginError').textContent = 'Номер не найден.';
-document.getElementById('loginError').style.display = 'block';
-return;
-}
-// Если РОП — запрашиваем пароль
-if (user.role === 'rop') {
-const passwordField = document.getElementById('passwordField');
-if (passwordField.style.display !== 'block') {
-passwordField.style.display = 'block';
-document.getElementById('loginPassword').focus();
-document.getElementById('loginBtn').textContent = 'Войти с паролем';
-return;
-}
-const password = document.getElementById('loginPassword').value.trim();
-if (!password) { alert('Введите пароль'); return; }
-if (password !== user.password) {
-document.getElementById('loginError').textContent = 'Неверный пароль.';
-document.getElementById('loginError').style.display = 'block';
-return;
-}
-}
-// Вход успешен
-currentUserPhone = phone;
-currentUserRole = user.role;
-document.getElementById('loginScreen').style.display = 'none';
-if (user.role === 'rop') {
-document.getElementById('ropScreen').style.display = 'block';
-} else {
-document.getElementById('crmScreen').style.display = 'block';
-}
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { 
+    alert('Введите номер телефона'); 
+    return; 
+  }
+
+  const {  user, error: fetchError } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role, password')
+    .eq('phone', phone)
+    .single();
+
+  if (fetchError || !user) {
+    document.getElementById('loginError').textContent = 'Номер не найден.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  if (user.role === 'rop') {
+    const passwordField = document.getElementById('passwordField');
+    if (passwordField.style.display !== 'block') {
+      passwordField.style.display = 'block';
+      document.getElementById('loginPassword').focus();
+      document.getElementById('loginBtn').textContent = 'Войти с паролем';
+      return;
+    }
+
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!password) {
+      alert('Введите пароль');
+      return;
+    }
+
+    if (password !== user.password) {
+      document.getElementById('loginError').textContent = 'Неверный пароль.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+  }
+
+  currentUserPhone = phone;
+  currentUserRole = user.role;
+  document.getElementById('loginScreen').style.display = 'none';
+  if (user.role === 'rop') {
+    document.getElementById('ropScreen').style.display = 'block';
+  } else {
+    document.getElementById('crmScreen').style.display = 'block';
+  }
 });
 // 🔍 Проверка CRM ID
 document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -1189,3 +1199,4 @@ managerSelect.appendChild(opt);
 </script>
 </body>
 </html>
+
