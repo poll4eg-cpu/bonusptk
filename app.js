@@ -40,7 +40,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   const phone = document.getElementById('loginPhone').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
   if (!phone || !password) {
-    document.getElementById('loginError').textContent = 'Введите номер телефона и пароль';
+    document.getElementById('loginError').textContent = 'Введите номер и пароль';
     document.getElementById('loginError').classList.remove('hidden');
     return;
   }
@@ -414,11 +414,12 @@ function showUpdateForm(deal) {
   });
 }
 
-// 📊 Загрузка данных РОПа — ИСПРАВЛЕНО
+// 📊 Загрузка данных РОПа — ИСПРАВЛЕНО: фильтр по менеджерам работает
 async function loadRopData() {
   const period = document.getElementById('ropPeriod').value;
   const now = new Date();
   let startDate, endDate;
+
   if (period === 'week') {
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
@@ -450,7 +451,7 @@ async function loadRopData() {
 
   const allDeals = data || [];
 
-  // 🔁 Заполняем фильтр менеджерами из данных
+  // ✅ ЗАПОЛНЯЕМ ФИЛЬТР МЕНЕДЖЕРАМИ ИЗ ЗАГРУЖЕННЫХ ДАННЫХ — КАЖДЫЙ РАЗ!
   const managerSet = new Set(allDeals.map(d => d.manager_name));
   const managerSelect = document.getElementById('ropManagerFilter');
   managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
@@ -467,19 +468,22 @@ async function loadRopData() {
   let deals = allDeals;
   if (managerFilter) deals = deals.filter(d => d.manager_name === managerFilter);
   if (segmentFilter) {
-    const typeMap = { 'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq', 'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent' };
+    const typeMap = {
+      'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
+      'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent'
+    };
     const dealType = typeMap[segmentFilter];
     deals = deals.filter(d => d.deal_type === dealType);
   }
 
   // Итоги
   let totalMargin = deals.reduce((sum, d) => sum + (d.margin || 0), 0);
-  const cleanMargin = totalMargin * 0.78; // минус 22% НДС
+  const cleanMargin = totalMargin * 0.78;
   const ropBonus = Math.round(cleanMargin * 0.10);
+
   document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
   document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
   document.getElementById('totalDealsRop').textContent = deals.length;
-
   document.getElementById('ropSummary').classList.remove('hidden');
   document.getElementById('ropDealsTable').classList.remove('hidden');
 
@@ -491,12 +495,12 @@ async function loadRopData() {
   Object.entries(managers)
     .sort((a, b) => b[1] - a[1])
     .forEach(([name, margin]) => {
-      const pct = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
+      const percent = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
       managersList.innerHTML += `
         <div class="analytics-item">
           <div class="manager-label">${name}</div>
           <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${pct}%</div>
+          <div class="percent">${percent}%</div>
         </div>
       `;
     });
@@ -514,12 +518,12 @@ async function loadRopData() {
   Object.entries(segments)
     .sort((a, b) => b[1] - a[1])
     .forEach(([name, margin]) => {
-      const pct = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
+      const percent = totalMargin ? Math.round((margin / totalMargin) * 100) : 0;
       segmentsList.innerHTML += `
         <div class="analytics-item">
           <div class="segment-label">${name}</div>
           <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${pct}%</div>
+          <div class="percent">${percent}%</div>
         </div>
       `;
     });
@@ -557,11 +561,12 @@ async function loadRopData() {
   });
 }
 
-// ➕ Создание и редактирование сделок от РОПа — без изменений
+// ➕ Создание сделки от РОПа
 document.getElementById('ropCreateDealBtn').addEventListener('click', () => {
   const crmId = prompt('Введите номер сделки из CRM:');
   if (crmId) showRopCreateForm(crmId.trim());
 });
+
 function showRopCreateForm(crmId) {
   document.getElementById('ropScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
@@ -676,6 +681,7 @@ function showRopCreateForm(crmId) {
     }, 2000);
   });
 }
+
 function showRopUpdateForm(deal) {
   document.getElementById('ropScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
@@ -740,7 +746,7 @@ function showRopUpdateForm(deal) {
   });
 }
 
-// 🔙 Обработчики кнопок "Назад" и "Редактировать"
+// 🔙 Универсальный обработчик кнопок
 document.addEventListener('click', (e) => {
   if (e.target.id === 'backBtn') {
     document.getElementById('mainApp').classList.add('hidden');
@@ -762,6 +768,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// 🔄 Обработчики кнопок РОПа
+// 🔄 Кнопки РОПа
 document.getElementById('loadRopData').addEventListener('click', loadRopData);
 document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
