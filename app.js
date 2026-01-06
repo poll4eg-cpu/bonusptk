@@ -5,7 +5,7 @@ const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
 let currentUserPhone = null;
 let currentUserRole = null;
-let currentUserName = null; // ← Имя из профиля
+let currentUserName = null;
 
 // 📊 Расчёт премии
 function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -58,7 +58,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   }
   currentUserPhone = phone;
   currentUserRole = data.role;
-  currentUserName = data.name; // ← Сохраняем имя
+  currentUserName = data.name;
   document.getElementById('loginScreen').classList.add('hidden');
   if (data.role === 'rop') {
     document.getElementById('ropScreen').classList.remove('hidden');
@@ -107,11 +107,11 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     alert('Ваше имя не указано в системе. Обратитесь к руководителю.');
     return;
   }
-  const managerName = data.name.trim(); // ← Обрезаем пробелы
+  const managerName = data.name.trim();
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const { data: deals, error: dealsError } = await supabaseClient
+  const {  deals, error: dealsError } = await supabaseClient
     .from('deals')
     .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
     .eq('manager_name', managerName)
@@ -274,7 +274,18 @@ function showCreateForm(crmId) {
   });
   document.getElementById('deal_type').dispatchEvent(new Event('change'));
   document.getElementById('createDealBtn').addEventListener('click', async () => {
-    const managerName = currentUserName; // ← Имя из профиля!
+    // Проверка на дубликат
+    const { data: existingDeal } = await supabaseClient
+      .from('deals')
+      .select('*')
+      .eq('crm_id', crmId)
+      .single();
+    if (existingDeal) {
+      alert(`Сделка с CRM ID ${crmId} уже существует.`);
+      return;
+    }
+
+    const managerName = currentUserName;
     const contractAmount = parseFloat(document.getElementById('contract_amount').value);
     const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
     const dealType = document.getElementById('deal_type').value;
@@ -321,7 +332,7 @@ function showCreateForm(crmId) {
       }]);
     if (error) {
       if (error.code === '23505') { // duplicate key
-        alert('Сделка с таким CRM ID уже существует. Введите другой.');
+        alert(`Сделка с CRM ID ${crmId} уже существует.`);
       } else {
         alert('Ошибка сохранения: ' + error.message);
       }
@@ -678,7 +689,11 @@ function showRopCreateForm(crmId) {
         bonus_paid: bonusPaid
       }]);
     if (error) {
-      alert('Ошибка: ' + error.message);
+      if (error.code === '23505') {
+        alert(`Сделка с CRM ID ${crmId} уже существует.`);
+      } else {
+        alert('Ошибка: ' + error.message);
+      }
       return;
     }
     document.getElementById('ropCreateFormResult').textContent = '✅ Сделка создана!';
