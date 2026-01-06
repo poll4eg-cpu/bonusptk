@@ -61,8 +61,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   currentUserName = data.name;
   document.getElementById('loginScreen').classList.add('hidden');
   if (data.role === 'rop') {
-    // Для теста пока не показываем РОПа
-    document.getElementById('crmScreen').classList.remove('hidden');
+    document.getElementById('ropScreen').classList.remove('hidden');
   } else {
     document.getElementById('crmScreen').classList.remove('hidden');
   }
@@ -112,7 +111,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const {  deals, error: dealsError } = await supabaseClient
+  const { data: deals, error: dealsError } = await supabaseClient
     .from('deals')
     .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
     .eq('manager_name', managerName)
@@ -122,6 +121,20 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     alert('Ошибка: ' + dealsError.message);
     return;
   }
+
+  // Если сделок нет — показываем сообщение
+  if (!deals || deals.length === 0) {
+    const resultDiv = document.getElementById('monthResult');
+    resultDiv.innerHTML = `
+      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+        <strong>Нет сделок за текущий месяц.</strong>
+      </div>
+    `;
+    resultDiv.classList.remove('hidden');
+    return;
+  }
+
   let totalMargin = 0;
   let totalBonus = 0;
   const dealRows = deals.map(deal => {
@@ -139,10 +152,10 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
         <td>${
       deal.deal_type === 'to' ? 'ТО' :
       deal.deal_type === 'pto' ? 'ПТО' :
-      deal.deal_type === 'eq' ? 'Оборудование' :
-      deal.deal_type === 'comp' ? 'Комплектующие' :
-      deal.deal_type === 'rep' ? 'Ремонты' :
-      deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
+      deal.deал_type === 'eq' ? 'Оборудование' :
+      deal.deал_type === 'comp' ? 'Комплектующие' :
+      deal.deал_type === 'rep' ? 'Ремонты' :
+      deal.deал_type === 'rent' ? 'Аренда' : deal.deал_type
     }</td>
         <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
         <td>${status}</td>
@@ -151,6 +164,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
       </tr>
     `;
   }).join('');
+
   const basePlan = 800000;
   const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
   const plan = basePlan * coefficients[now.getMonth()];
