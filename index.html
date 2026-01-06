@@ -1004,13 +1004,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     .sort((a, b) => b[1] - a[1])
     .forEach(([name, margin]) => {
       const percent = Math.round((margin / totalMargin) * 100);
-      managersList.innerHTML += `
-        <div class="analytics-item">
-          <div class="manager-label">${name}</div>
-          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${percent}%</div>
-        </div>
-      `;
+      managersList.innerHTML += 
+  '<div class="analytics-item">' +
+    '<div class="manager-label">' + name + '</div>' +
+    '<div class="value">' + margin.toLocaleString('ru-RU') + ' ₽</div>' +
+    '<div class="percent">' + percent + '%</div>' +
+  '</div>';
     });
   document.getElementById('managersAnalytics').style.display = 'block';
   // 👇 АНАЛИТИКА ПО СЕГМЕНТАМ
@@ -1030,13 +1029,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     .sort((a, b) => b[1] - a[1])
     .forEach(([name, margin]) => {
       const percent = Math.round((margin / totalMargin) * 100);
-      segmentsList.innerHTML += `
-        <div class="analytics-item">
-          <div class="segment-label">${name}</div>
-          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
-          <div class="percent">${percent}%</div>
-        </div>
-      `;
+      segmentsList.innerHTML += 
+  '<div class="analytics-item">' +
+    '<div class="segment-label">' + name + '</div>' +
+    '<div class="value">' + margin.toLocaleString('ru-RU') + ' ₽</div>' +
+    '<div class="percent">' + percent + '%</div>' +
+  '</div>';
     });
   document.getElementById('segmentsAnalytics').style.display = 'block';
   // 👇 ЗАПОЛНЕНИЕ ТАБЛИЦЫ
@@ -1430,6 +1428,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
 
 
 
