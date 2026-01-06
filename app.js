@@ -207,6 +207,14 @@ document.getElementById('sendFeedbackBtn').addEventListener('click', async () =>
       created_at: new Date().toISOString()
     }]);
   if (error) {
+  if (error.code === '23505') { // duplicate key
+    alert('Сделка с таким CRM ID уже существует. Введите другой.');
+  } else {
+    alert('Ошибка сохранения: ' + error.message);
+  }
+  return;
+}
+  if (error) {
     alert('Не удалось отправить сообщение. Попробуйте позже.');
   } else {
     document.getElementById('feedbackResult').textContent = '✅ Спасибо! Ваше сообщение отправлено.';
@@ -772,4 +780,5 @@ document.addEventListener('click', (e) => {
 // 🔄 Кнопки РОПа
 document.getElementById('loadRopData').addEventListener('click', loadRopData);
 document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
+
 
