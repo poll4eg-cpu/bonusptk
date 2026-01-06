@@ -416,6 +416,7 @@ function showUpdateForm(deal) {
 
 // 📊 Загрузка данных РОПа — ИСПРАВЛЕНО: фильтр по менеджерам работает
 async function loadRopData() {
+  console.log('loadRopData вызвана');
   const period = document.getElementById('ropPeriod').value;
   const now = new Date();
   let startDate, endDate;
@@ -771,3 +772,4 @@ document.addEventListener('click', (e) => {
 // 🔄 Кнопки РОПа
 document.getElementById('loadRopData').addEventListener('click', loadRopData);
 document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
+
