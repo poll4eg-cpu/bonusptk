@@ -5,6 +5,7 @@ const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
 let currentUserPhone = null;
 let currentUserRole = null;
+let currentUserName = null; // ← Имя из профиля
 
 // 📊 Расчёт премии
 function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -57,6 +58,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   }
   currentUserPhone = phone;
   currentUserRole = data.role;
+  currentUserName = data.name; // ← Сохраняем имя
   document.getElementById('loginScreen').classList.add('hidden');
   if (data.role === 'rop') {
     document.getElementById('ropScreen').classList.remove('hidden');
@@ -105,7 +107,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     alert('Ваше имя не указано в системе. Обратитесь к руководителю.');
     return;
   }
-  const managerName = data.name;
+  const managerName = data.name.trim(); // ← Обрезаем пробелы
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -207,14 +209,6 @@ document.getElementById('sendFeedbackBtn').addEventListener('click', async () =>
       created_at: new Date().toISOString()
     }]);
   if (error) {
-  if (error.code === '23505') { // duplicate key
-    alert('Сделка с таким CRM ID уже существует. Введите другой.');
-  } else {
-    alert('Ошибка сохранения: ' + error.message);
-  }
-  return;
-}
-  if (error) {
     alert('Не удалось отправить сообщение. Попробуйте позже.');
   } else {
     document.getElementById('feedbackResult').textContent = '✅ Спасибо! Ваше сообщение отправлено.';
@@ -227,7 +221,7 @@ document.getElementById('sendFeedbackBtn').addEventListener('click', async () =>
   }
 });
 
-// ➕ Форма создания (менеджер)
+// ➕ Форма создания (менеджер) - ИСПРАВЛЕНО
 function showCreateForm(crmId) {
   document.getElementById('crmScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
@@ -236,8 +230,7 @@ function showCreateForm(crmId) {
       <i class="fas fa-arrow-left"></i> Назад к CRM ID
     </button>
     <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
-    <label>Ваше имя:</label>
-    <input type="text" id="manager_name" placeholder="Иван Петров" required>
+    <p><strong>Менеджер:</strong> ${currentUserName}</p>
     <label>Сумма договора (₽):</label>
     <input type="number" id="contract_amount" placeholder="600000" required>
     <label>Сумма предоплаты (₽):</label>
@@ -281,7 +274,7 @@ function showCreateForm(crmId) {
   });
   document.getElementById('deal_type').dispatchEvent(new Event('change'));
   document.getElementById('createDealBtn').addEventListener('click', async () => {
-    const managerName = document.getElementById('manager_name').value.trim();
+    const managerName = currentUserName; // ← Имя из профиля!
     const contractAmount = parseFloat(document.getElementById('contract_amount').value);
     const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
     const dealType = document.getElementById('deal_type').value;
@@ -291,7 +284,7 @@ function showCreateForm(crmId) {
     const paid = document.getElementById('paid').checked;
     const upSigned = document.getElementById('up_signed').checked;
     if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-      alert('Заполните имя, сумму договора и предоплаты');
+      alert('Заполните сумму договора и предоплаты');
       return;
     }
     const totalPaid = paymentAmount;
@@ -327,7 +320,11 @@ function showCreateForm(crmId) {
         bonus_paid: bonusPaid
       }]);
     if (error) {
-      alert('Ошибка сохранения: ' + error.message);
+      if (error.code === '23505') { // duplicate key
+        alert('Сделка с таким CRM ID уже существует. Введите другой.');
+      } else {
+        alert('Ошибка сохранения: ' + error.message);
+      }
       return;
     }
     document.getElementById('createFormResult').innerHTML = `
@@ -422,13 +419,11 @@ function showUpdateForm(deal) {
   });
 }
 
-// 📊 Загрузка данных РОПа — ИСПРАВЛЕНО: фильтр по менеджерам работает
+// 📊 Загрузка данных РОПа
 async function loadRopData() {
-  console.log('loadRopData вызвана');
   const period = document.getElementById('ropPeriod').value;
   const now = new Date();
   let startDate, endDate;
-
   if (period === 'week') {
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
@@ -446,21 +441,17 @@ async function loadRopData() {
     endDate = new Date(now.getFullYear(), 11, 31);
   }
   endDate.setHours(23, 59, 59, 999);
-
   const { data, error } = await supabaseClient
     .from('deals')
     .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
-
   if (error) {
     alert('Ошибка загрузки данных: ' + error.message);
     return;
   }
-
   const allDeals = data || [];
-
-  // ✅ ЗАПОЛНЯЕМ ФИЛЬТР МЕНЕДЖЕРАМИ ИЗ ЗАГРУЖЕННЫХ ДАННЫХ — КАЖДЫЙ РАЗ!
+  // Заполнение фильтра менеджерами
   const managerSet = new Set(allDeals.map(d => d.manager_name));
   const managerSelect = document.getElementById('ropManagerFilter');
   managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
@@ -470,8 +461,7 @@ async function loadRopData() {
     opt.textContent = name;
     managerSelect.appendChild(opt);
   });
-
-  // Применяем текущие фильтры
+  // Применение фильтров
   const managerFilter = document.getElementById('ropManagerFilter').value;
   const segmentFilter = document.getElementById('ropSegmentFilter').value;
   let deals = allDeals;
@@ -484,18 +474,15 @@ async function loadRopData() {
     const dealType = typeMap[segmentFilter];
     deals = deals.filter(d => d.deal_type === dealType);
   }
-
   // Итоги
   let totalMargin = deals.reduce((sum, d) => sum + (d.margin || 0), 0);
   const cleanMargin = totalMargin * 0.78;
   const ropBonus = Math.round(cleanMargin * 0.10);
-
   document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
   document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
   document.getElementById('totalDealsRop').textContent = deals.length;
   document.getElementById('ropSummary').classList.remove('hidden');
   document.getElementById('ropDealsTable').classList.remove('hidden');
-
   // Аналитика по менеджерам
   const managers = {};
   deals.forEach(d => managers[d.manager_name] = (managers[d.manager_name] || 0) + (d.margin || 0));
@@ -514,7 +501,6 @@ async function loadRopData() {
       `;
     });
   document.getElementById('managersAnalytics').classList.remove('hidden');
-
   // Аналитика по сегментам
   const segments = {};
   const labels = { 'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование', 'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда' };
@@ -537,7 +523,6 @@ async function loadRopData() {
       `;
     });
   document.getElementById('segmentsAnalytics').classList.remove('hidden');
-
   // Таблица сделок
   const tbody = document.getElementById('ropDealsBody');
   tbody.innerHTML = '';
@@ -586,8 +571,7 @@ function showRopCreateForm(crmId) {
     <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
     <label>Менеджер:</label>
     <select id="ropManagerName">
-      <option value="Илья Галунин">Илья Галунин</option>
-      <option value="Мария Сидорова">Мария Сидорова</option>
+      <option value="">Выберите менеджера</option>
     </select>
     <label>Сумма договора (₽):</label>
     <input type="number" id="ropContractAmount" placeholder="600000" required>
@@ -625,6 +609,22 @@ function showRopCreateForm(crmId) {
     <button id="ropCreateDealBtn" class="success">Создать сделку</button>
     <div id="ropCreateFormResult" class="result hidden"></div>
   `;
+  // Загрузка списка менеджеров
+  supabaseClient
+    .from('allowed_users')
+    .select('name')
+    .eq('role', 'manager')
+    .then(({ data, error }) => {
+      if (!error && data) {
+        const select = document.getElementById('ropManagerName');
+        data.forEach(user => {
+          const option = document.createElement('option');
+          option.value = user.name;
+          option.textContent = user.name;
+          select.appendChild(option);
+        });
+      }
+    });
   document.getElementById('ropDealType').addEventListener('change', () => {
     const isTO = document.getElementById('ropDealType').value === 'to';
     document.getElementById('ropArpuSection').style.display = isTO ? 'block' : 'none';
@@ -755,7 +755,7 @@ function showRopUpdateForm(deal) {
   });
 }
 
-// 🔙 Универсальный обработчик кнопок
+// 🔙 Обработчики кнопок
 document.addEventListener('click', (e) => {
   if (e.target.id === 'backBtn') {
     document.getElementById('mainApp').classList.add('hidden');
@@ -780,5 +780,3 @@ document.addEventListener('click', (e) => {
 // 🔄 Кнопки РОПа
 document.getElementById('loadRopData').addEventListener('click', loadRopData);
 document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
-
-
