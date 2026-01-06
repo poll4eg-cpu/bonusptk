@@ -918,74 +918,158 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   }
 
   // 📊 Загрузка данных РОПа
-  async function loadRopData() {
-    const period = document.getElementById('ropPeriod').value;
-    const now = new Date();
-    
-    let startDate, endDate;
-    if (period === 'week') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      startDate = new Date(now.setDate(diff));
-      endDate = new Date(now.setDate(startDate.getDate() + 6));
-    } else if (period === 'month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    } else if (period === 'quarter') {
-      const quarter = Math.floor(now.getMonth() / 3);
-      startDate = new Date(now.getFullYear(), quarter * 3, 1);
-      endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
-    } else if (period === 'year') {
-      startDate = new Date(now.getFullYear(), 0, 1);
-      endDate = new Date(now.getFullYear(), 11, 31);
-    }
-
-    endDate.setHours(23, 59, 59, 999);
-
-    const {   data, error } = await supabaseClient
-      .from('deals')
-      .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
-
-    if (error) {
-      console.error('Ошибка Supabase:', error);
-      alert('Ошибка загрузки данных: ' + error.message);
-      document.getElementById('ropSummary').style.display = 'none';
-      document.getElementById('ropDealsTable').style.display = 'none';
-      document.getElementById('managersAnalytics').style.display = 'none';
-      document.getElementById('segmentsAnalytics').style.display = 'none';
-      return;
-    }
-
-    if (!data) {
-      alert('Нет данных за выбранный период.');
-      document.getElementById('ropSummary').style.display = 'none';
-      document.getElementById('ropDealsTable').style.display = 'none';
-      document.getElementById('managersAnalytics').style.display = 'none';
-      document.getElementById('segmentsAnalytics').style.display = 'none';
-      return;
-    }
-
-    const allDeals = data;
-
-    // 👇 ПРИМЕНЕНИЕ ФИЛЬТРОВ
-    const managerFilter = document.getElementById('ropManagerFilter').value;
-    const segmentFilter = document.getElementById('ropSegmentFilter').value;
-
-    let deals = allDeals;
-    if (managerFilter) {
-      deals = deals.filter(d => d.manager_name === managerFilter);
-    }
-    if (segmentFilter) {
-      const typeMap = {
-        'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
-        'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent'
-      };
-      const dealType = typeMap[segmentFilter];
-      deals = deals.filter(d => d.deal_type === dealType);
-    }
-
+ async function loadRopData() {
+  const period = document.getElementById('ropPeriod').value;
+  const now = new Date();
+  let startDate, endDate;
+  if (period === 'week') {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startDate = new Date(now.setDate(diff));
+    endDate = new Date(now.setDate(startDate.getDate() + 6));
+  } else if (period === 'month') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (period === 'quarter') {
+    const quarter = Math.floor(now.getMonth() / 3);
+    startDate = new Date(now.getFullYear(), quarter * 3, 1);
+    endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+  } else if (period === 'year') {
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = new Date(now.getFullYear(), 11, 31);
+  }
+  endDate.setHours(23, 59, 59, 999);
+  const { data, error } = await supabaseClient
+    .from('deals')
+    .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, paid, up_signed, created_at')
+    .gte('created_at', startDate.toISOString())
+    .lte('created_at', endDate.toISOString());
+  if (error) {
+    console.error('Ошибка Supabase:', error);
+    alert('Ошибка загрузки данных: ' + error.message);
+    document.getElementById('ropSummary').style.display = 'none';
+    document.getElementById('ropDealsTable').style.display = 'none';
+    document.getElementById('managersAnalytics').style.display = 'none';
+    document.getElementById('segmentsAnalytics').style.display = 'none';
+    return;
+  }
+  const allDeals = data || [];
+  // 👇 Обновляем список менеджеров в фильтре (из загруженных данных)
+  const managerSet = new Set(allDeals.map(d => d.manager_name));
+  const managerSelect = document.getElementById('ropManagerFilter');
+  managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
+  managerSet.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    managerSelect.appendChild(opt);
+  });
+  // 👇 ПРИМЕНЕНИЕ ФИЛЬТРОВ
+  const managerFilter = document.getElementById('ropManagerFilter').value;
+  const segmentFilter = document.getElementById('ropSegmentFilter').value;
+  let deals = allDeals;
+  if (managerFilter) {
+    deals = deals.filter(d => d.manager_name === managerFilter);
+  }
+  if (segmentFilter) {
+    const typeMap = {
+      'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
+      'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent'
+    };
+    const dealType = typeMap[segmentFilter];
+    deals = deals.filter(d => d.deal_type === dealType);
+  }
+  // Расчёт итогов
+  let totalMargin = 0;
+  deals.forEach(deal => {
+    totalMargin += deal.margin || 0;
+  });
+  const nds = totalMargin * 0.22;
+  const cleanMargin = totalMargin - nds;
+  const ropBonus = Math.round(cleanMargin * 0.10);
+  document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
+  document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
+  document.getElementById('totalDealsRop').textContent = deals.length;
+  document.getElementById('ropSummary').style.display = 'block';
+  document.getElementById('ropDealsTable').style.display = 'block';
+  // 👇 АНАЛИТИКА ПО МЕНЕДЖЕРАМ
+  const managers = {};
+  deals.forEach(d => {
+    if (!managers[d.manager_name]) managers[d.manager_name] = 0;
+    managers[d.manager_name] += d.margin || 0;
+  });
+  const managersList = document.getElementById('managersChart');
+  managersList.innerHTML = '';
+  Object.entries(managers)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([name, margin]) => {
+      const percent = Math.round((margin / totalMargin) * 100);
+      managersList.innerHTML += `
+        <div class="analytics-item">
+          <div class="manager-label">${name}</div>
+          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
+          <div class="percent">${percent}%</div>
+        </div>
+      `;
+    });
+  document.getElementById('managersAnalytics').style.display = 'block';
+  // 👇 АНАЛИТИКА ПО СЕГМЕНТАМ
+  const segments = {};
+  const typeLabels = {
+    'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
+    'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
+  };
+  deals.forEach(d => {
+    const label = typeLabels[d.deal_type] || d.deal_type;
+    if (!segments[label]) segments[label] = 0;
+    segments[label] += d.margin || 0;
+  });
+  const segmentsList = document.getElementById('segmentsChart');
+  segmentsList.innerHTML = '';
+  Object.entries(segments)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([name, margin]) => {
+      const percent = Math.round((margin / totalMargin) * 100);
+      segmentsList.innerHTML += `
+        <div class="analytics-item">
+          <div class="segment-label">${name}</div>
+          <div class="value">${margin.toLocaleString('ru-RU')} ₽</div>
+          <div class="percent">${percent}%</div>
+        </div>
+      `;
+    });
+  document.getElementById('segmentsAnalytics').style.display = 'block';
+  // 👇 ЗАПОЛНЕНИЕ ТАБЛИЦЫ
+  const tbody = document.getElementById('ropDealsBody');
+  tbody.innerHTML = '';
+  deals.forEach(deal => {
+    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+    const updStatus = deal.up_signed ? '<span class="status-icon icon-success">✔️</span>' : '<span class="status-icon icon-danger">✖️</span>';
+    const typeLabel =
+      deal.deal_type === 'to' ? 'ТО' :
+      deal.deal_type === 'pto' ? 'ПТО' :
+      deal.deal_type === 'eq' ? 'Оборудование' :
+      deal.deal_type === 'comp' ? 'Комплектующие' :
+      deal.deal_type === 'rep' ? 'Ремонты' :
+      deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="no-wrap">${deal.crm_id}</td>
+      <td class="no-wrap">${deal.manager_name}</td>
+      <td class="no-wrap">${typeLabel}</td>
+      <td class="no-wrap">${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+      <td class="no-wrap"><span class="margin-value">${(deal.margin || 0).toLocaleString('ru-RU')} ₽</span></td>
+      <td class="no-wrap">${status}</td>
+      <td class="no-wrap">${updStatus}</td>
+      <td>
+        <button class="editDealBtn" data-crm-id="${deal.crm_id}" style="background:var(--primary); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:14px;">
+          ✏️ Редакт.
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
     // Расчёт итогов
     let totalMargin = 0;
     deals.forEach(deal => {
@@ -1342,30 +1426,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   // 🔄 Кнопка применения фильтров
   document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
 
-  // 🔄 Загрузка списка менеджеров
-  document.addEventListener('click', async () => {
-    if (document.getElementById('ropScreen').style.display !== 'none') {
-      const {   data, error } = await supabaseClient
-        .from('deals')
-        .select('manager_name')
-        .order('manager_name');
-
-      if (error) return;
-
-      const managerSet = new Set(data.map(d => d.manager_name));
-      const managerSelect = document.getElementById('ropManagerFilter');
-      managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
-      managerSet.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        managerSelect.appendChild(opt);
-      });
-    }
-  });
 });
 </script>
 </body>
 </html>
+
 
 
