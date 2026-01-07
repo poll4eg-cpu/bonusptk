@@ -9,48 +9,53 @@
   --border: #e8e8e8;
   --text-light: #888;
 }
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   max-width: 100%;
   margin: 0;
   padding: 0;
   background: var(--bg);
-  box-sizing: border-box;
 }
+
 .container {
   max-width: 100%;
   margin: 20px auto;
   padding: 0 16px;
-  box-sizing: border-box;
 }
+
 h1, h2, h3, h4 {
   color: var(--text);
   margin-top: 0;
   font-weight: 600;
 }
+
 label {
   display: block;
   margin-top: 12px;
   font-weight: 600;
   color: var(--text);
 }
+
 input, select, button, textarea {
   width: 100%;
   padding: 10px;
   margin-top: 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  box-sizing: border-box;
   font-size: 16px;
   font-family: inherit;
 }
+
 input[type="checkbox"] {
   width: auto;
   margin-right: 8px;
 }
-.result, .error, .hidden {
-  display: none;
-}
+
 .result {
   margin-top: 24px;
   padding: 16px;
@@ -61,11 +66,9 @@ input[type="checkbox"] {
   font-size: 18px;
   font-weight: bold;
   color: var(--primary);
+  display: none;
 }
-.error {
-  color: var(--danger);
-  margin-top: 10px;
-}
+
 .card {
   background: var(--card);
   border-radius: 12px;
@@ -74,6 +77,7 @@ input[type="checkbox"] {
   margin-bottom: 20px;
   overflow: hidden;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -85,25 +89,23 @@ th, td {
   padding: 8px;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  word-break: break-all;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 th {
   background-color: #f0f9ff;
   font-weight: 600;
   font-size: 15px;
 }
+
 @media (max-width: 768px) {
   .container { padding: 10px; }
   .card { padding: 16px; }
   table { font-size: 13px; }
   th, td { padding: 6px; font-size: 13px; }
-  .filter-row { flex-direction: column; gap: 10px; }
-  .analytics-card { padding: 12px; }
-  .analytics-item { min-width: 100px; }
 }
+
 button {
   background: var(--primary);
   color: white;
@@ -111,76 +113,33 @@ button {
   padding: 10px 16px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
   font-size: 16px;
   font-weight: 500;
 }
-button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+button:hover { opacity: 0.9; }
+.btn-success { background: var(--success); }
+.btn-warning { background: var(--warning); }
+
+.error-message {
+  color: var(--danger);
+  margin-top: 10px;
+  display: none;
 }
-button.success { background: var(--success); }
-button.warning { background: var(--warning); }
-button.danger { background: var(--danger); }
-.filter-row {
-  display: flex;
-  gap: 12px;
-  margin: 15px 0;
-  flex-wrap: wrap;
-}
-.analytics-card {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 16px;
-  margin: 12px 0;
-}
-.analytics-item {
-  flex: 1;
-  min-width: 120px;
-  background: #fff;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+
+.feedback-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
   text-align: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-.analytics-item .label {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 6px;
-}
-.analytics-item .value {
-  font-size: 18px;
-  font-weight: bold;
-  color: var(--primary);
-  margin: 6px 0;
-}
-.analytics-item .percent {
-  font-size: 13px;
-  color: var(--text-light);
-}
-.status-icon {
-  font-size: 16px;
-  margin: 0 4px;
-}
-.icon-success { color: var(--success); }
-.icon-danger { color: var(--danger); }
-.table-container {
-  overflow-x: hidden;
-  margin: 12px 0;
-}
-.no-wrap {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.margin-value {
-  font-weight: 600;
-  color: var(--primary);
-}
-.segment-label, .manager-label {
-  font-weight: 600;
-  color: var(--text);
+#feedbackForm {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  max-width: 500px;
+  margin: 15px auto;
 }
 footer {
   margin-top: 40px;
@@ -189,7 +148,6 @@ footer {
   text-align: center;
   color: var(--text-light);
   font-size: 14px;
-  font-family: 'Segoe UI', sans-serif;
   background: var(--card);
   padding: 12px;
 }
