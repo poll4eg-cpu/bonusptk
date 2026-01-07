@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 📅 Премия за месяц
   document.getElementById('checkMonthBtn').addEventListener('click', async () => {
-    const {  data, error: userError } = await supabaseClient
+    const { data, error: userError } = await supabaseClient
       .from('allowed_users')
       .select('name')
       .eq('phone', currentUserPhone)
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const {    deals, error: dealsError } = await supabaseClient
+    const { deals, error: dealsError } = await supabaseClient
       .from('deals')
       .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
       .eq('manager_name', managerName)
@@ -458,5 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
 
 
