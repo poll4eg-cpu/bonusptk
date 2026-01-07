@@ -243,8 +243,8 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     document.getElementById('formContainer').innerHTML = `
       <button id="backBtn">← Назад к CRM ID</button>
       <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
-      <label>Ваше имя:</label>
-      <input type="text" id="manager_name" placeholder="Иван Петров" required>
+      <label>Ваше имя (автоматически):</label>
+      <input type="text" id="manager_name" value="${currentUserName || ''}" readonly>
       <label>Сумма договора (₽):</label>
       <input type="number" id="contract_amount" placeholder="600000" required>
       <label>Сумма предоплаты (₽):</label>
@@ -458,6 +458,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
