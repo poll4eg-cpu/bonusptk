@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
   let currentUserPhone = null;
+  let currentUserName = null;
 
   // 📊 Расчёт премии
   function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     currentUserPhone = phone;
+    currentUserName = data.name;
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('crmScreen').style.display = 'block';
   });
@@ -456,6 +458,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
