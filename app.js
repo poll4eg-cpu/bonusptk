@@ -114,6 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Ошибка загрузки сделок: ' + dealsError.message);
       return;
     }
+    // 🔍 Отладочный код:
+  console.log('🔍 Запрос к deals:', { managerName, deals, dealsError });
+
+  if (dealsError) {
+    alert('Ошибка загрузки сделок: ' + dealsError.message);
+    return;
+  }
 
     // ❗ Проверяем, что deals — массив
     if (!deals || !Array.isArray(deals)) {
@@ -451,4 +458,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
 
