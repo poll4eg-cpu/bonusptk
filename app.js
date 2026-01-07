@@ -77,14 +77,30 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     return;
   }
 
-  // Успешный вход
-  currentUserPhone = phone;
-  currentUserName = data.name;
-  currentUserRole = data.role;
+ // Успешный вход
+currentUserPhone = phone;
+currentUserName = data.name;
+currentUserRole = data.role;
 
-  document.getElementById('loginScreen').style.display = 'none';
+document.getElementById('loginScreen').style.display = 'none';
+
+if (data.role === 'rop') {
+  document.getElementById('ropScreen').style.display = 'block';
+  // Динамически загружаем rop.js
+  if (!window.ropModuleLoaded) {
+    const script = document.createElement('script');
+    script.src = 'rop.js';
+    script.onload = () => {
+      if (typeof initRopPanel === 'function') {
+        initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+      }
+      window.ropModuleLoaded = true;
+    };
+    document.head.appendChild(script);
+  }
+} else {
   document.getElementById('crmScreen').style.display = 'block';
-});
+}
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -491,6 +507,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
