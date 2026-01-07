@@ -154,62 +154,6 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 
   if (deals.length === 0) {
     resultDiv.innerHTML = `
-      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-        <strong>Нет данных.</strong><br>
-        Сделок не найдено.
-      </div>
-    `;
-    resultDiv.style.display = 'block';
-    return;
-  }
-
-  let totalMargin = 0;
-  let totalBonus = 0;
-
-  const dealRows = deals.map(deal => {
-    const margin = 
-      deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
-      deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
-      deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
-      deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
-
-    totalMargin += margin;
-    totalBonus += deal.bonus_paid || 0;
-
-    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
-
-    return `
-      <tr>
-        <td>${deal.crm_id}</td>
-        <td>${
-          deal.deal_type === 'to' ? 'ТО' :
-          deal.deal_type === 'pto' ? 'ПТО' :
-          deal.deal_type === 'eq' ? 'Оборудование' :
-          deal.deal_type === 'comp' ? 'Комплектующие' :
-          deal.deal_type === 'rep' ? 'Ремонты' :
-          deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
-        }</td>
-        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-        <td>${status}</td>
-        <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
-      </tr>
-    `;
-  }).join('');
-
-  const basePlan = 800000;
-  const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-  const plan = basePlan * coefficients[now.getMonth()];
-  const planPercent = (totalMargin / plan) * 100;
-
-  let finalPayout = 0;
-  if (planPercent >= 100) {
-    finalPayout = totalBonus;
-  } else if (planPercent >= 50) {
-    finalPayout = Math.round(totalBonus * 0.5);
-  }
-
-  resultDiv.innerHTML = `
   <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
   <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
     <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
@@ -241,6 +185,9 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     </tbody>
   </table>
 `;
+  }
+
+  
 
   // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
@@ -491,6 +438,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
