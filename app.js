@@ -210,31 +210,37 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
   }
 
   resultDiv.innerHTML = `
-    <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-      <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-      <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-      <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-      <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+  <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+  <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+    <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+    <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+    <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+    <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+  </div>
+  <!-- 🔵 Прогресс-бар выполнения плана -->
+  <div style="margin-top:12px;">
+    <strong>Выполнение плана:</strong>
+    <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
+      <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
     </div>
-    <h4>Сделки (${deals.length} шт):</h4>
-    <table style="width:100%; font-size:14px;">
-      <thead>
-        <tr>
-          <th>CRM ID</th>
-          <th>Тип</th>
-          <th>Договор</th>
-          <th>Оплата</th>
-          <th>Премия</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${dealRows}
-      </tbody>
-    </table>
-  `;
-  resultDiv.style.display = 'block';
-});
+    <small>${planPercent.toFixed(1)}%</small>
+  </div>
+  <h4>Сделки (${deals.length} шт):</h4>
+  <table style="width:100%; font-size:14px;">
+    <thead>
+      <tr>
+        <th>CRM ID</th>
+        <th>Тип</th>
+        <th>Договор</th>
+        <th>Оплата</th>
+        <th>Премия</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dealRows}
+    </tbody>
+  </table>
+`;
 
   // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
@@ -485,6 +491,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
