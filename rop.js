@@ -100,6 +100,15 @@ async function loadRopData() {
     document.getElementById('totalDealsRop').textContent = deals.length;
     document.getElementById('ropSummary').style.display = 'block';
     document.getElementById('ropDealsTable').style.display = 'block';
+    // 💡 План отдела = 800 000 ₽ * 4 (например, для месяца)
+// Вы можете задать свой коэффициент
+const basePlan = 3200000; // 800k * 4 менеджера (пример)
+const planPercent = Math.min(100, (totalMargin / basePlan) * 100);
+
+// Отображаем прогресс
+document.getElementById('ropPlanBar').style.width = planPercent + '%';
+document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
+document.getElementById('ropPlanProgress').style.display = 'block';
 
     // Аналитика по менеджерам
     const managers = {};
