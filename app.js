@@ -38,29 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
- // 👤 Авторизация
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('loginPhone').value.trim();
-  if (!phone) { alert('Введите номер телефона'); return; }
-
-  const { data, error } = await supabaseClient
-    .from('allowed_users')
-    .select('phone, name')
-    .eq('phone', phone)
-    .single();
-
-  // Всегда сохраняем телефон — даже если ошибка
-  currentUserPhone = phone;
-
-  if (error || !data) {
-    document.getElementById('loginError').textContent = 'Номер не найден.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
-
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('crmScreen').style.display = 'block';
-});
+  // 👤 Авторизация
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const phone = document.getElementById('loginPhone').value.trim();
+    if (!phone) { alert('Введите номер телефона'); return; }
+    const { data, error } = await supabaseClient
+      .from('allowed_users')
+      .select('phone, name')
+      .eq('phone', phone)
+      .single();
+    if (error || !data) {
+      document.getElementById('loginError').textContent = 'Номер не найден.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    currentUserPhone = phone;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('crmScreen').style.display = 'block';
+  });
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -117,6 +112,20 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
     if (dealsError) {
       alert('Ошибка загрузки сделок: ' + dealsError.message);
+      return;
+    }
+
+    // ❗ Проверяем, что deals — массив
+    if (!deals || !Array.isArray(deals)) {
+      const resultDiv = document.getElementById('monthResult');
+      resultDiv.innerHTML = `
+        <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+        <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+          <strong>Нет данных.</strong><br>
+          Сделок не найдено.
+        </div>
+      `;
+      resultDiv.style.display = 'block';
       return;
     }
 
@@ -442,4 +451,3 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     }
   });
 });
-
