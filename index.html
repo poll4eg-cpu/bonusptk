@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8">
   <title>Калькулятор премий</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
-  <!-- Подключаем Supabase ГЛОБАЛЬНО -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="script.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -16,118 +15,41 @@
       <h1>Калькулятор премий</h1>
       <label>Ваш рабочий номер телефона:</label>
       <input type="text" id="loginPhone" placeholder="+79123456789">
-      <label>Пароль:</label>
-      <input type="password" id="loginPassword" placeholder="••••••••">
       <button id="loginBtn">Войти</button>
-      <div id="loginError" class="error hidden"></div>
+      <div id="loginError" class="error-message"></div>
     </div>
 
-    <!-- Экран 2: Менеджер -->
-    <div id="crmScreen" class="card hidden">
+    <!-- Экран 2: CRM -->
+    <div id="crmScreen" class="card" style="display:none;">
       <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
       <label>Номер сделки в CRM (из Битрикс):</label>
       <input type="text" id="inputCrmId" placeholder="Например: 12345">
-      <button id="checkCrmBtn" class="success">Найти / Создать</button>
-      <div id="crmError" class="error hidden"></div>
-      <button id="checkMonthBtn" class="warning" style="margin-top:15px;">Посмотреть премию за месяц</button>
-      <div id="monthResult" class="result hidden"></div>
+      <button id="checkCrmBtn" class="btn-success">Найти / Создать</button>
+      <div id="crmError" class="error-message"></div>
+
+      <button id="checkMonthBtn" class="btn-warning">Посмотреть премию за месяц</button>
+      <div id="monthResult" class="result"></div>
 
       <!-- Обратная связь -->
-      <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); text-align:center;">
-        <button id="feedbackBtn" style="background:#f0f9ff; border:1px solid #91d5ff; padding:8px 16px; border-radius:6px; cursor:pointer; color:var(--primary);">
-          <i class="fas fa-comment"></i> Написать разработчику
-        </button>
-        <div id="feedbackForm" class="hidden" style="margin-top:15px; padding:15px; background:#fff; border:1px solid #ddd; border-radius:8px; max-width:500px; margin:15px auto;">
-          <textarea id="feedbackText" placeholder="Ваша идея, ошибка или пожелание..." style="width:100%; height:80px; margin-bottom:10px; padding:8px; border:1px solid #ccc; border-radius:4px;"></textarea>
-          <button id="sendFeedbackBtn" class="success">Отправить</button>
-          <div id="feedbackResult" class="success hidden" style="margin-top:10px;"></div>
+      <div class="feedback-section">
+        <button id="feedbackBtn">Написать разработчику</button>
+        <div id="feedbackForm" style="display:none;">
+          <textarea id="feedbackText" placeholder="Ваша идея, ошибка или пожелание..."></textarea>
+          <button id="sendFeedbackBtn" class="btn-success">Отправить</button>
+          <div id="feedbackResult"></div>
         </div>
       </div>
     </div>
 
-    <!-- Экран 3: Панель РОПа -->
-    <div id="ropScreen" class="card hidden">
-      <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
-      <div class="filter-row">
-        <div style="flex:1; min-width:150px;">
-          <label>Период:</label>
-          <select id="ropPeriod">
-            <option value="month">Текущий месяц</option>
-            <option value="week">Текущая неделя</option>
-            <option value="quarter">Текущий квартал</option>
-            <option value="year">Текущий год</option>
-          </select>
-        </div>
-        <div style="flex:1; min-width:150px;">
-          <label>&nbsp;</label>
-          <button id="loadRopData">Загрузить</button>
-        </div>
-      </div>
-      <button id="ropCreateDealBtn" class="success" style="margin-top:15px; width:100%;">Создать сделку</button>
-      <div id="ropSummary" class="result hidden" style="text-align:left; padding:16px;">
-        <h3>Итоги за период</h3>
-        <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
-        <p><strong>Премия РОПа:</strong> <span id="ropBonus">0</span> ₽</p>
-        <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
-      </div>
-      <div class="filter-row">
-        <div style="flex:1; min-width:150px;">
-          <label>Менеджер:</label>
-          <select id="ropManagerFilter">
-            <option value="">Все менеджеры</option>
-          </select>
-        </div>
-        <div style="flex:1; min-width:150px;">
-          <label>Сегмент:</label>
-          <select id="ropSegmentFilter">
-            <option value="">Все сегменты</option>
-            <option value="ТО">ТО</option>
-            <option value="ПТО">ПТО</option>
-            <option value="Оборудование">Оборудование</option>
-            <option value="Комплектующие">Комплектующие</option>
-            <option value="Ремонты">Ремонты</option>
-            <option value="Аренда">Аренда</option>
-          </select>
-        </div>
-        <div style="flex:1; min-width:150px;">
-          <label>&nbsp;</label>
-          <button id="applyRopFilters">Применить</button>
-        </div>
-      </div>
-      <div id="managersAnalytics" class="analytics-card hidden">
-        <h4>Топ менеджеров</h4>
-        <div id="managersChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
-      </div>
-      <div id="segmentsAnalytics" class="analytics-card hidden">
-        <h4>Маржа по сегментам</h4>
-        <div id="segmentsChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
-      </div>
-      <div id="ropDealsTable" class="hidden" style="margin-top:20px;">
-        <h3>Сделки отдела</h3>
-        <div class="table-container">
-          <table id="ropDealsList" style="width:100%;">
-            <thead>
-              <tr>
-                <th>CRM ID</th><th>Менеджер</th><th>Тип</th><th>Договор</th>
-                <th>Маржа</th><th>Оплата</th><th>УПД</th><th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="ropDealsBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Динамические формы -->
-    <div id="mainApp" class="hidden">
+    <!-- Форма -->
+    <div id="mainApp" style="display:none;">
       <div id="formContainer"></div>
     </div>
 
-    <!-- Подпись -->
     <footer>Разработчик — Илья Галунин</footer>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <!-- Иконки -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
-
