@@ -39,25 +39,52 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
-  // 👤 Авторизация
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const phone = document.getElementById('loginPhone').value.trim();
-    if (!phone) { alert('Введите номер телефона'); return; }
-    const { data, error } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name')
-      .eq('phone', phone)
-      .single();
-    if (error || !data) {
-      document.getElementById('loginError').textContent = 'Номер не найден.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-    currentUserPhone = phone;
-    currentUserName = data.name;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('crmScreen').style.display = 'block';
-  });
+  // 👤 Авторизация с паролем для всех
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { alert('Введите номер телефона'); return; }
+
+  // Сначала показываем поле пароля при первом клике
+  const passwordField = document.getElementById('passwordField');
+  if (passwordField.style.display !== 'block') {
+    passwordField.style.display = 'block';
+    document.getElementById('loginPassword').focus();
+    document.getElementById('loginBtn').textContent = 'Войти';
+    return;
+  }
+
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!password) { alert('Введите пароль'); return; }
+
+  // Запрашиваем данные пользователя
+  const { data, error } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role, password')
+    .eq('phone', phone)
+    .single();
+
+  if (error || !data) {
+    document.getElementById('loginError').textContent = 'Номер не найден.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  // Проверяем пароль
+  if (password !== data.password) {
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').textContent = 'Неверный пароль.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  // Успешный вход
+  currentUserPhone = phone;
+  currentUserName = data.name;
+  currentUserRole = data.role;
+
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('crmScreen').style.display = 'block';
+});
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -458,6 +485,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
