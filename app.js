@@ -85,129 +85,127 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 📅 Премия за месяц
-  document.getElementById('checkMonthBtn').addEventListener('click', async () => {
-    const { data, error: userError } = await supabaseClient
-      .from('allowed_users')
-      .select('name')
-      .eq('phone', currentUserPhone)
-      .single();
+ // 📅 Премия за месяц
+document.getElementById('checkMonthBtn').addEventListener('click', async () => {
+  const { data: userData, error: userError } = await supabaseClient
+    .from('allowed_users')
+    .select('name')
+    .eq('phone', currentUserPhone)
+    .single();
 
-    if (userError || !data || !data.name) {
-      alert('Ошибка авторизации.');
-      return;
-    }
-
-    const managerName = data.name;
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const { deals, error: dealsError } = await supabaseClient
-      .from('deals')
-      .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
-      .eq('manager_name', managerName)
-      .gte('created_at', startOfMonth.toISOString())
-      .lte('created_at', endOfMonth.toISOString());
-
-    if (dealsError) {
-      alert('Ошибка загрузки сделок: ' + dealsError.message);
-      return;
-    }
-    // 🔍 Отладочный код:
-  console.log('🔍 Запрос к deals:', { managerName, deals, dealsError });
-
-  if (dealsError) {
-    alert('Ошибка загрузки сделок: ' + dealsError.message);
+  if (userError || !userData || !userData.name) {
+    alert('Ошибка авторизации.');
     return;
   }
 
-    // ❗ Проверяем, что deals — массив
-    if (!deals || !Array.isArray(deals)) {
-      const resultDiv = document.getElementById('monthResult');
-      resultDiv.innerHTML = `
-        <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-        <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-          <strong>Нет данных.</strong><br>
-          Сделок не найдено.
-        </div>
-      `;
-      resultDiv.style.display = 'block';
-      return;
-    }
+  const managerName = userData.name;
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    let totalMargin = 0;
-    let totalBonus = 0;
+  // 🔥 Правильный вызов без деструктуризации
+  const dealsResponse = await supabaseClient
+    .from('deals')
+    .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
+    .eq('manager_name', managerName)
+    .gte('created_at', startOfMonth.toISOString())
+    .lte('created_at', endOfMonth.toISOString());
 
-    const dealRows = deals.map(deal => {
-      const margin = 
-        deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
-        deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
-        deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
-        deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
+  console.log('Deals response:', dealsResponse);
 
-      totalMargin += margin;
-      totalBonus += deal.bonus_paid || 0;
+  if (dealsResponse.error) {
+    alert('Ошибка загрузки сделок: ' + dealsResponse.error.message);
+    return;
+  }
 
-      const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+  // ✅ Гарантированно получаем массив
+  const deals = Array.isArray(dealsResponse.data) ? dealsResponse.data : [];
 
-      return `
-        <tr>
-          <td>${deal.crm_id}</td>
-          <td>${
-            deal.deal_type === 'to' ? 'ТО' :
-            deal.deal_type === 'pto' ? 'ПТО' :
-            deal.deal_type === 'eq' ? 'Оборудование' :
-            deal.deal_type === 'comp' ? 'Комплектующие' :
-            deal.deal_type === 'rep' ? 'Ремонты' :
-            deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
-          }</td>
-          <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-          <td>${status}</td>
-          <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
-        </tr>
-      `;
-    }).join('');
+  const resultDiv = document.getElementById('monthResult');
 
-    const basePlan = 800000;
-    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-    const plan = basePlan * coefficients[now.getMonth()];
-    const planPercent = (totalMargin / plan) * 100;
-
-    let finalPayout = 0;
-    if (planPercent >= 100) {
-      finalPayout = totalBonus;
-    } else if (planPercent >= 50) {
-      finalPayout = Math.round(totalBonus * 0.5);
-    }
-
-    const resultDiv = document.getElementById('monthResult');
+  if (deals.length === 0) {
     resultDiv.innerHTML = `
       <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
       <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-        <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-        <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-        <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-        <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+        <strong>Нет данных.</strong><br>
+        Сделок не найдено.
       </div>
-      <h4>Сделки (${deals.length} шт):</h4>
-      <table style="width:100%; font-size:14px;">
-        <thead>
-          <tr>
-            <th>CRM ID</th>
-            <th>Тип</th>
-            <th>Договор</th>
-            <th>Оплата</th>
-            <th>Премия</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${dealRows}
-        </tbody>
-      </table>
     `;
     resultDiv.style.display = 'block';
-  });
+    return;
+  }
+
+  let totalMargin = 0;
+  let totalBonus = 0;
+
+  const dealRows = deals.map(deal => {
+    const margin = 
+      deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
+      deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
+      deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
+      deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
+
+    totalMargin += margin;
+    totalBonus += deal.bonus_paid || 0;
+
+    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+
+    return `
+      <tr>
+        <td>${deal.crm_id}</td>
+        <td>${
+          deal.deal_type === 'to' ? 'ТО' :
+          deal.deal_type === 'pto' ? 'ПТО' :
+          deal.deal_type === 'eq' ? 'Оборудование' :
+          deal.deal_type === 'comp' ? 'Комплектующие' :
+          deal.deal_type === 'rep' ? 'Ремонты' :
+          deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
+        }</td>
+        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+        <td>${status}</td>
+        <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
+      </tr>
+    `;
+  }).join('');
+
+  const basePlan = 800000;
+  const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+  const plan = basePlan * coefficients[now.getMonth()];
+  const planPercent = (totalMargin / plan) * 100;
+
+  let finalPayout = 0;
+  if (planPercent >= 100) {
+    finalPayout = totalBonus;
+  } else if (planPercent >= 50) {
+    finalPayout = Math.round(totalBonus * 0.5);
+  }
+
+  resultDiv.innerHTML = `
+    <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+      <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+      <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+      <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+      <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+    </div>
+    <h4>Сделки (${deals.length} шт):</h4>
+    <table style="width:100%; font-size:14px;">
+      <thead>
+        <tr>
+          <th>CRM ID</th>
+          <th>Тип</th>
+          <th>Договор</th>
+          <th>Оплата</th>
+          <th>Премия</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dealRows}
+      </tbody>
+    </table>
+  `;
+  resultDiv.style.display = 'block';
+});
 
   // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
@@ -458,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
 
 
 
