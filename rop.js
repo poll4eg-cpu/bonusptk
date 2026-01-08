@@ -219,4 +219,242 @@ async function loadRopData() {
     console.error('Ошибка в loadRopData:', error);
     alert('Ошибка: ' + error.message);
   }
+  // ➕ Создание сделки от РОПа
+function showRopCreateForm() {
+  const crmId = prompt('Введите номер сделки из CRM:');
+  if (!crmId) return;
+
+  // Скрыть панель РОПа, показать форму
+  document.getElementById('ropScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+
+  // Загрузить список менеджеров
+  ropSupabaseClient
+    .from('allowed_users')
+    .select('name, role')
+    .eq('role', 'manager')
+    .order('name')
+    .then(({ data, error }) => {
+      if (error) {
+        alert('Ошибка загрузки менеджеров: ' + error.message);
+        return;
+      }
+
+      // Добавляем РОПа тоже (если нужно)
+      data.push({ name: ropCurrentUserName, role: 'rop' });
+
+      let managerOptions = '';
+      data.forEach(user => {
+        managerOptions += `<option value="${user.name}">${user.name}${user.role === 'rop' ? ' (РОП)' : ''}</option>`;
+      });
+
+      document.getElementById('formContainer').innerHTML = `
+        <button id="backToRopBtn">← Назад к панели РОПа</button>
+        <h3>Создать сделку: ${crmId}</h3>
+        <label>Менеджер:</label>
+        <select id="ropManagerName">${managerOptions}</select>
+        <label>Сумма договора (₽):</label>
+        <input type="number" id="ropContractAmount" placeholder="600000" required>
+        <label>Сумма оплаты (₽):</label>
+        <input type="number" id="ropPaymentAmount" placeholder="140000" required>
+        <label>Тип сделки:</label>
+        <select id="ropDealType">
+          <option value="to">ТО</option>
+          <option value="pto">ПТО</option>
+          <option value="comp">Комплектующие</option>
+          <option value="rep">Ремонты</option>
+          <option value="eq">Оборудование</option>
+          <option value="rent">Аренда</option>
+        </select>
+        <div id="ropArpuSection" style="display:none;">
+          <label>ARPU (₽/мес):</label>
+          <input type="number" id="ropArpu" placeholder="46666">
+        </div>
+        <div style="margin-top:15px;">
+          <input type="checkbox" id="ropIsFirst"> 
+          <label for="ropIsFirst">Первый платёж (ТО)?</label>
+        </div>
+        <div style="margin-top:10px;">
+          <input type="checkbox" id="ropPaid"> 
+          <label for="ropPaid">Оплачен?</label>
+        </div>
+        <div style="margin-top:10px;">
+          <input type="checkbox" id="ropUpdSigned"> 
+          <label for="ropUpdSigned">УПД подписан?</label>
+        </div>
+        <button id="ropCreateDealBtnFinal" class="btn-success" style="margin-top:15px;">Создать сделку</button>
+        <div id="ropCreateFormResult" class="result" style="margin-top:10px;"></div>
+      `;
+
+      // ARPU для ТО
+      document.getElementById('ropDealType').addEventListener('change', () => {
+        const isTO = document.getElementById('ropDealType').value === 'to';
+        document.getElementById('ropArpuSection').style.display = isTO ? 'block' : 'none';
+      });
+
+      // Создание сделки
+      document.getElementById('ropCreateDealBtnFinal').addEventListener('click', async () => {
+        const managerName = document.getElementById('ropManagerName').value;
+        const contractAmount = parseFloat(document.getElementById('ropContractAmount').value);
+        const paymentAmount = parseFloat(document.getElementById('ropPaymentAmount').value);
+        const dealType = document.getElementById('ropDealType').value;
+        const arpuInput = document.getElementById('ropArpu').value;
+        const isFirst = document.getElementById('ropIsFirst').checked;
+        const paid = document.getElementById('ropPaid').checked;
+        const upSigned = document.getElementById('ropUpdSigned').checked;
+
+        if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
+          alert('Заполните все поля');
+          return;
+        }
+
+        const isFullyPaid = paymentAmount >= contractAmount;
+        let margin = 0;
+        if (dealType === 'to' || dealType === 'pto' || dealType === 'rent') {
+          margin = contractAmount * 0.7;
+        } else if (dealType === 'eq') {
+          margin = contractAmount * 0.2;
+        } else if (dealType === 'comp' || dealType === 'rep') {
+          margin = contractAmount * 0.3;
+        }
+
+        let bonusPaid = 0;
+        if (isFullyPaid && paid && upSigned) {
+          let revenueForBonus = contractAmount;
+          if (dealType === 'to') {
+            const arpuValue = arpuInput ? parseFloat(arpuInput) : contractAmount / 12;
+            revenueForBonus = arpuValue;
+          }
+          bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, false);
+        }
+
+        const { error } = await ropSupabaseClient
+          .from('deals')
+          .insert([{
+            crm_id: crmId,
+            manager_name: managerName,
+            deal_type: dealType,
+            contract_amount: contractAmount,
+            total_paid: paymentAmount,
+            paid: isFullyPaid,
+            up_signed: upSigned,
+            is_first: isFirst,
+            arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
+            margin: margin,
+            bonus_paid: bonusPaid
+          }]);
+
+        if (error) {
+          alert('Ошибка: ' + error.message);
+          return;
+        }
+
+        document.getElementById('ropCreateFormResult').innerHTML = '✅ Сделка создана!';
+        setTimeout(() => {
+          document.getElementById('mainApp').style.display = 'none';
+          document.getElementById('ropScreen').style.display = 'block';
+          loadRopData(); // обновить данные
+        }, 2000);
+      });
+    });
+}
+
+// 🖊️ Редактирование сделки
+async function showRopUpdateForm(crmId) {
+  const { data, error } = await ropSupabaseClient
+    .from('deals')
+    .select('*')
+    .eq('crm_id', crmId)
+    .single();
+
+  if (error || !data) {
+    alert('Ошибка загрузки сделки');
+    return;
+  }
+
+  document.getElementById('ropScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+
+  const deal = data;
+  const typeLabels = {
+    'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
+    'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
+  };
+
+  document.getElementById('formContainer').innerHTML = `
+    <button id="backToRopBtn">← Назад к панели РОПа</button>
+    <h3>Редактировать сделку: ${crmId}</h3>
+    <p><strong>Менеджер:</strong> ${deal.manager_name}</p>
+    <p><strong>Тип:</strong> ${typeLabels[deal.deal_type] || deal.deal_type}</p>
+    <p><strong>Договор:</strong> ${deal.contract_amount.toLocaleString('ru-RU')} ₽</p>
+    <label>Новая сумма оплаты (₽):</label>
+    <input type="number" id="ropPaymentAmount" value="${deal.total_paid}" placeholder="Например: 100000">
+    <div style="margin-top:15px;">
+      <input type="checkbox" id="ropPaid" ${deal.paid ? 'checked' : ''}> 
+      <label for="ropPaid">Оплачен полностью</label>
+    </div>
+    <div style="margin-top:10px;">
+      <input type="checkbox" id="ropUpdSigned" ${deal.up_signed ? 'checked' : ''}> 
+      <label for="ropUpdSigned">УПД подписан</label>
+    </div>
+    <button id="saveRopDealBtn" class="btn-success" style="margin-top:15px;">Сохранить изменения</button>
+    <div id="ropUpdateResult" class="result" style="margin-top:10px;"></div>
+  `;
+
+  document.getElementById('saveRopDealBtn').addEventListener('click', async () => {
+    const newPayment = parseFloat(document.getElementById('ropPaymentAmount').value) || deal.total_paid;
+    const newPaid = document.getElementById('ropPaid').checked;
+    const newUpd = document.getElementById('ropUpdSigned').checked;
+
+    const isFullyPaid = newPayment >= deal.contract_amount;
+
+    // Пересчёт премии
+    let bonusPaid = deal.bonus_paid;
+    if (isFullyPaid && newPaid && newUpd && !deal.bonus_paid) {
+      let revenueForBonus = deal.contract_amount;
+      if (deal.deal_type === 'to') {
+        const arpuValue = deal.arpu_input || deal.contract_amount / 12;
+        revenueForBonus = arpuValue;
+      }
+      bonusPaid = calculateBonus(deal.deal_type, revenueForBonus, deal.is_first, true, newUpd, deal.annual_contract);
+    } else if (!newPaid || !newUpd) {
+      bonusPaid = 0; // если сняли галочку — премия аннулируется
+    }
+
+    const { error } = await ropSupabaseClient
+      .from('deals')
+      .update({
+        total_paid: newPayment,
+        paid: isFullyPaid,
+        up_signed: newUpd,
+        bonus_paid: bonusPaid
+      })
+      .eq('crm_id', crmId);
+
+    if (error) {
+      alert('Ошибка: ' + error.message);
+      return;
+    }
+
+    document.getElementById('ropUpdateResult').innerHTML = '✅ Изменения сохранены!';
+    setTimeout(() => {
+      document.getElementById('mainApp').style.display = 'none';
+      document.getElementById('ropScreen').style.display = 'block';
+      loadRopData(); // обновить данные
+    }, 2000);
+  });
+}
+
+// 🔙 Универсальный "назад"
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'backToRopBtn') {
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
+  }
+  // Обработка редактирования из таблицы
+  if (e.target.classList.contains('editDealBtn')) {
+    const crmId = e.target.getAttribute('data-crm-id');
+    showRopUpdateForm(crmId);
+  }
+});
 }
