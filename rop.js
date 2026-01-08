@@ -41,7 +41,7 @@ async function loadUsersList() {
     const { data, error } = await ropSupabaseClient
       .from('allowed_users')
       .select('phone, name, role')
-      .order('created_at', { ascending: true });
+      .order('name', { ascending: true }) // или .order('phone')
 
     if (error) throw error;
 
