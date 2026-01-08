@@ -5,37 +5,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentUserPhone = null;
   let currentUserName = null;
-  // 💡 Управление историей браузера
-function updateUrl(screenName) {
-  const newUrl = `${window.location.origin}/#${screenName}`;
-  window.history.pushState({ screen: screenName }, '', newUrl);
-}
+  let currentUserRole = null;
 
-// Обработка нажатия «Назад»
-window.addEventListener('popstate', (event) => {
-  const screen = event.state?.screen || 'login';
-  showScreen(screen);
-  // При первой загрузке — определить экран из URL
-const screenFromUrl = window.location.hash.replace('#', '') || 'login';
-showScreen(screenFromUrl);
-});
-  // 💡 Переключение экранов по имени
-function showScreen(screenName) {
-  // Скрыть все экраны
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('crmScreen').style.display = 'none';
-  document.getElementById('mainApp').style.display = 'none';
-  
-  // Показать нужный
-  if (screenName === 'login') {
-    document.getElementById('loginScreen').style.display = 'block';
-  } else if (screenName === 'crm') {
-    document.getElementById('crmScreen').style.display = 'block';
-  } else if (screenName === 'form') {
-    document.getElementById('mainApp').style.display = 'block';
+  // 💡 Управление историей браузера
+  function updateUrl(screenName) {
+    const newUrl = `${window.location.origin}/#${screenName}`;
+    window.history.pushState({ screen: screenName }, '', newUrl);
   }
-  // ropScreen обрабатывается отдельно (в rop.js), поэтому пока не трогаем
-}
+
+  function showScreen(screenName) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('crmScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    if (document.getElementById('ropScreen')) {
+      document.getElementById('ropScreen').style.display = 'none';
+    }
+
+    if (screenName === 'login') {
+      document.getElementById('loginScreen').style.display = 'block';
+    } else if (screenName === 'crm') {
+      document.getElementById('crmScreen').style.display = 'block';
+    } else if (screenName === 'form') {
+      document.getElementById('mainApp').style.display = 'block';
+    }
+  }
+
+  // 🏆 Турнирная таблица (только менеджеры)
+  async function loadDepartmentRanking(currentMonth) {
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Загружаем сделки
+    const { data: deals, error: dealsError } = await supabaseClient
+      .from('deals')
+      .select('manager_name, margin')
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+
+    if (dealsError || !deals) return [];
+
+    // Получаем роли
+    const managerNames = [...new Set(deals.map(d => d.manager_name))];
+    const { data: users, error: usersError } = await supabaseClient
+      .from('allowed_users')
+      .select('name, role')
+      .in('name', managerNames);
+
+    if (usersError) return [];
+
+    // Только менеджеры
+    const managerNamesOnly = new Set(
+      users.filter(u => u.role === 'manager').map(u => u.name)
+    );
+
+    // Считаем маржу
+    const managerStats = {};
+    deals.forEach(deal => {
+      if (managerNamesOnly.has(deal.manager_name)) {
+        if (!managerStats[deal.manager_name]) {
+          managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
+        }
+        managerStats[deal.manager_name].margin += deal.margin || 0;
+      }
+    });
+
+    return Object.values(managerStats)
+      .sort((a, b) => b.margin - a.margin)
+      .map((m, i) => ({ ...m, rank: i + 1 }));
+  }
 
   // 📊 Расчёт премии
   function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -61,78 +98,63 @@ function showScreen(screenName) {
       if (revenue >= 300000) return Math.round(revenue * 0.01);
       return Math.round(revenue * 0.03);
     }
-    if (dealType === 'eq') {
-      return Math.round(revenue * 0.01);
-    }
-    if (dealType === 'rent') {
-      return 1500;
-    }
+    if (dealType === 'eq') return Math.round(revenue * 0.01);
+    if (dealType === 'rent') return 1500;
     return 0;
   }
 
-  // 👤 Авторизация с паролем для всех
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('loginPhone').value.trim();
-  if (!phone) { alert('Введите номер телефона'); return; }
+  // 👤 Авторизация
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const phone = document.getElementById('loginPhone').value.trim();
+    if (!phone) { alert('Введите номер телефона'); return; }
 
-  // Сначала показываем поле пароля при первом клике
-  const passwordField = document.getElementById('passwordField');
-  if (passwordField.style.display !== 'block') {
-    passwordField.style.display = 'block';
-    document.getElementById('loginPassword').focus();
-    document.getElementById('loginBtn').textContent = 'Войти';
-    return;
-  }
+    const passwordField = document.getElementById('passwordField');
+    if (passwordField.style.display !== 'block') {
+      passwordField.style.display = 'block';
+      document.getElementById('loginPassword').focus();
+      document.getElementById('loginBtn').textContent = 'Войти';
+      return;
+    }
 
-  const password = document.getElementById('loginPassword').value.trim();
-  if (!password) { alert('Введите пароль'); return; }
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!password) { alert('Введите пароль'); return; }
 
-  // Запрашиваем данные пользователя
-  const { data, error } = await supabaseClient
-    .from('allowed_users')
-    .select('phone, name, role, password')
-    .eq('phone', phone)
-    .single();
+    const { data, error } = await supabaseClient
+      .from('allowed_users')
+      .select('phone, name, role, password')
+      .eq('phone', phone)
+      .single();
 
-  if (error || !data) {
-    document.getElementById('loginError').textContent = 'Номер не найден.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
+    if (error || !data) {
+      document.getElementById('loginError').textContent = 'Номер не найден.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
 
-  // Проверяем пароль
-  if (password !== data.password) {
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginError').textContent = 'Неверный пароль.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
+    if (password !== data.password) {
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginError').textContent = 'Неверный пароль.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
 
- // Успешный вход
-currentUserPhone = phone;
-currentUserName = data.name;
-currentUserRole = data.role;
+    currentUserPhone = phone;
+    currentUserName = data.name;
+    currentUserRole = data.role;
 
-showScreen('crm');
-
-if (data.role === 'rop') {
-  document.getElementById('ropScreen').style.display = 'block';
-  // Динамически загружаем rop.js
-  if (!window.ropModuleLoaded) {
-    const script = document.createElement('script');
-    script.src = 'rop.js';
-    script.onload = () => {
-      if (typeof initRopPanel === 'function') {
-        initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+    if (data.role === 'rop') {
+      document.getElementById('loginScreen').style.display = 'none';
+      if (document.getElementById('ropScreen')) {
+        document.getElementById('ropScreen').style.display = 'block';
+        // Подключите rop.js позже, если нужно
+      } else {
+        alert('Панель РОПа не настроена. Обратитесь к разработчику.');
       }
-      window.ropModuleLoaded = true;
-    };
-    document.head.appendChild(script);
-  }
-} else {
-  updateUrl('crm');
-}
-  }); 
+    } else {
+      showScreen('crm');
+      updateUrl('crm');
+    }
+  });
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -162,181 +184,164 @@ if (data.role === 'rop') {
     }
   });
 
- // 📅 Премия за месяц
-document.getElementById('checkMonthBtn').addEventListener('click', async () => {
-  const { data: userData, error: userError } = await supabaseClient
-    .from('allowed_users')
-    .select('name')
-    .eq('phone', currentUserPhone)
-    .single();
+  // 📅 Премия за месяц
+  document.getElementById('checkMonthBtn').addEventListener('click', async () => {
+    const { data: userData, error: userError } = await supabaseClient
+      .from('allowed_users')
+      .select('name')
+      .eq('phone', currentUserPhone)
+      .single();
 
-  if (userError || !userData || !userData.name) {
-    alert('Ошибка авторизации.');
-    return;
-  }
-
-  const managerName = userData.name;
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-  const dealsResponse = await supabaseClient
-    .from('deals')
-    .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
-    .eq('manager_name', managerName)
-    .gte('created_at', startOfMonth.toISOString())
-    .lte('created_at', endOfMonth.toISOString());
-
-  console.log('Deals response:', dealsResponse);
-
-  if (dealsResponse.error) {
-    alert('Ошибка загрузки сделок: ' + dealsResponse.error.message);
-    return;
-  }
-
-  const deals = Array.isArray(dealsResponse.data) ? dealsResponse.data : [];
-  const resultDiv = document.getElementById('monthResult');
-
-  // 💡 Расчёт итогов — ДО вывода
-  let totalMargin = 0;
-  let totalBonus = 0;
-
-  const dealRows = deals.map(deal => {
-    const margin = 
-      deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
-      deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
-      deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
-      deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
-
-    totalMargin += margin;
-    totalBonus += deal.bonus_paid || 0;
-
-    const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
-
-    return `
-      <tr>
-        <td>${deal.crm_id}</td>
-        <td>${
-          deal.deal_type === 'to' ? 'ТО' :
-          deal.deal_type === 'pto' ? 'ПТО' :
-          deal.deal_type === 'eq' ? 'Оборудование' :
-          deal.deal_type === 'comp' ? 'Комплектующие' :
-          deal.deal_type === 'rep' ? 'Ремонты' :
-          deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
-        }</td>
-        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-        <td>${status}</td>
-        <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
-      </tr>
-    `;
-  }).join('');
-
-  const basePlan = 800000;
-  const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-  const plan = basePlan * coefficients[now.getMonth()];
-  const planPercent = (totalMargin / plan) * 100;
-
-  let finalPayout = 0;
-  if (planPercent >= 100) {
-    finalPayout = totalBonus;
-  } else if (planPercent >= 50) {
-    finalPayout = Math.round(totalBonus * 0.5);
-  }
-
-  // 💡 Вывод — ОДИН раз, для всех случаев
-  if (deals.length === 0) {
-    resultDiv.innerHTML = `
-      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-        <strong>Нет данных.</strong><br>
-        Сделок не найдено.
-      </div>
-    `;
-} else {
-  resultDiv.innerHTML = `
-    <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-      <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-      <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-      <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-      <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
-    </div>
-    <!-- 🔵 Прогресс-бар -->
-    <div style="margin-top:12px;">
-      <strong>Выполнение плана:</strong>
-      <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
-        <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
-      </div>
-      <small>${planPercent.toFixed(1)}%</small>
-    </div>
-    <h4>Сделки (${deals.length} шт):</h4>
-    <table style="width:100%; font-size:14px;">
-      <thead>
-        <tr>
-          <th>CRM ID</th>
-          <th>Тип</th>
-          <th>Договор</th>
-          <th>Оплата</th>
-          <th>Премия</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${dealRows}
-      </tbody>
-    </table>
-  `;
-
-  // 🏆 Загрузка турнирной таблицы (только менеджеры)
-async function loadDepartmentRanking(currentMonth) {
-  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
-
-  // Загружаем все сделки
-  const { data: deals, error: dealsError } = await supabaseClient
-    .from('deals')
-    .select('manager_name, margin')
-    .gte('created_at', startOfMonth.toISOString())
-    .lte('created_at', endOfMonth.toISOString());
-
-  if (dealsError || !deals) return [];
-
-  // Получаем список менеджеров (только роль = 'manager')
-  const managerNames = [...new Set(deals.map(d => d.manager_name))];
-  const { data: users, error: usersError } = await supabaseClient
-    .from('allowed_users')
-    .select('name, role')
-    .in('name', managerNames);
-
-  if (usersError) {
-    console.error('Ошибка загрузки ролей:', usersError);
-    return [];
-  }
-
-  // Фильтруем: только менеджеры
-  const managerNamesOnly = new Set(
-    users
-      .filter(user => user.role === 'manager')
-      .map(user => user.name)
-  );
-
-  // Считаем маржу только по менеджерам
-  const managerStats = {};
-  deals.forEach(deal => {
-    if (managerNamesOnly.has(deal.manager_name)) {
-      if (!managerStats[deal.manager_name]) {
-        managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
-      }
-      managerStats[deal.manager_name].margin += deal.margin || 0;
+    if (userError || !userData || !userData.name) {
+      alert('Ошибка авторизации.');
+      return;
     }
+
+    const managerName = userData.name;
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const dealsResponse = await supabaseClient
+      .from('deals')
+      .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
+      .eq('manager_name', managerName)
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+
+    if (dealsResponse.error) {
+      alert('Ошибка загрузки сделок: ' + dealsResponse.error.message);
+      return;
+    }
+
+    const deals = Array.isArray(dealsResponse.data) ? dealsResponse.data : [];
+    const resultDiv = document.getElementById('monthResult');
+
+    let totalMargin = 0;
+    let totalBonus = 0;
+
+    const dealRows = deals.map(deal => {
+      const margin = 
+        deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
+        deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
+        deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
+        deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
+
+      totalMargin += margin;
+      totalBonus += deal.bonus_paid || 0;
+
+      const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
+
+      return `
+        <tr>
+          <td>${deal.crm_id}</td>
+          <td>${
+            deal.deal_type === 'to' ? 'ТО' :
+            deal.deal_type === 'pto' ? 'ПТО' :
+            deal.deal_type === 'eq' ? 'Оборудование' :
+            deal.deal_type === 'comp' ? 'Комплектующие' :
+            deal.deal_type === 'rep' ? 'Ремонты' :
+            deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
+          }</td>
+          <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+          <td>${status}</td>
+          <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
+        </tr>
+      `;
+    }).join('');
+
+    const basePlan = 800000;
+    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+    const plan = basePlan * coefficients[now.getMonth()];
+    const planPercent = (totalMargin / plan) * 100;
+
+    let finalPayout = 0;
+    if (planPercent >= 100) {
+      finalPayout = totalBonus;
+    } else if (planPercent >= 50) {
+      finalPayout = Math.round(totalBonus * 0.5);
+    }
+
+    if (deals.length === 0) {
+      resultDiv.innerHTML = `
+        <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+        <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+          <strong>Нет данных.</strong><br>
+          Сделок не найдено.
+        </div>
+      `;
+    } else {
+      resultDiv.innerHTML = `
+        <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+        <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+          <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+          <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+          <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+          <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+        </div>
+        <div style="margin-top:12px;">
+          <strong>Выполнение плана:</strong>
+          <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
+            <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
+          </div>
+          <small>${planPercent.toFixed(1)}%</small>
+        </div>
+        <h4>Сделки (${deals.length} шт):</h4>
+        <table style="width:100%; font-size:14px;">
+          <thead>
+            <tr>
+              <th>CRM ID</th>
+              <th>Тип</th>
+              <th>Договор</th>
+              <th>Оплата</th>
+              <th>Премия</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dealRows}
+          </tbody>
+        </table>
+      `;
+
+      // 💥 Турнирная таблица
+      const ranking = await loadDepartmentRanking(now);
+      if (ranking.length > 1) {
+        let rankingHtml = `
+          <h4 style="margin-top:25px;">🏆 Рейтинг отдела (${ranking.length} менеджеров)</h4>
+          <table style="width:100%; font-size:14px; margin-top:10px;">
+            <thead>
+              <tr>
+                <th>Место</th>
+                <th>Менеджер</th>
+                <th>Маржа</th>
+                <th>% от плана</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        const monthPlan = basePlan * coefficients[now.getMonth()];
+        ranking.forEach(manager => {
+          const planPct = Math.round((manager.margin / monthPlan) * 100);
+          const isCurrentUser = manager.name === currentUserName;
+          rankingHtml += `
+            <tr style="${isCurrentUser ? 'background:#fffbe6;' : ''}">
+              <td><strong>${manager.rank}</strong></td>
+              <td>${manager.name}</td>
+              <td>${manager.margin.toLocaleString('ru-RU')} ₽</td>
+              <td>${planPct}%</td>
+            </tr>
+          `;
+        });
+
+        rankingHtml += `</tbody></table>`;
+        resultDiv.innerHTML += rankingHtml;
+      }
+    }
+
+    resultDiv.style.display = 'block';
   });
 
-  return Object.values(managerStats)
-    .sort((a, b) => b.margin - a.margin)
-    .map((manager, index) => ({
-      ...manager,
-      rank: index + 1
-    }));
-}
   // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
     const form = document.getElementById('feedbackForm');
@@ -487,8 +492,8 @@ async function loadDepartmentRanking(currentMonth) {
     const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
     const remaining = contract_amount - total_paid;
 
-    document.getElementById('crmScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
+    showScreen('form');
+    updateUrl('form');
     document.getElementById('formContainer').innerHTML = `
       <button id="backBtn">← Назад к CRM ID</button>
       <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
@@ -580,59 +585,19 @@ async function loadDepartmentRanking(currentMonth) {
   // 🔙 Назад
   document.addEventListener('click', (e) => {
     if (e.target.id === 'backBtn') {
-      document.getElementById('monthResult').style.display = 'none'; // это доп. элемент — оставим
+      document.getElementById('monthResult').style.display = 'none';
       showScreen('crm');
       updateUrl('crm');
     }
   });
-  // 🏆 Загрузка турнирной таблицы отдела
-async function loadDepartmentRanking(currentUserPhone, currentMonth) {
-  const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
-  const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
-  const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+  // 🌐 Инициализация из URL
+  const screenFromUrl = window.location.hash.replace('#', '') || 'login';
+  showScreen(screenFromUrl);
 
-  // Загружаем всех менеджеров и их маржу
-  const { data, error } = await supabaseClient
-    .from('deals')
-    .select('manager_name, margin, contract_amount, paid')
-    .gte('created_at', startOfMonth.toISOString())
-    .lte('created_at', endOfMonth.toISOString());
-
-  if (error || !data) return [];
-
-  // Группируем по менеджеру
-  const managerStats = {};
-  data.forEach(deal => {
-    if (!managerStats[deal.manager_name]) {
-      managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
-    }
-    managerStats[deal.manager_name].margin += deal.margin || 0;
+  // 🔙 Поддержка кнопки "Назад" в браузере
+  window.addEventListener('popstate', (event) => {
+    const screen = event.state?.screen || 'login';
+    showScreen(screen);
   });
-
-  // Сортируем по марже (убывание)
-  return Object.values(managerStats)
-    .sort((a, b) => b.margin - a.margin)
-    .map((manager, index) => ({
-      ...manager,
-      rank: index + 1
-    }));
-}
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
