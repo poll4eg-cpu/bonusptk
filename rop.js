@@ -17,7 +17,10 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
     if (crmId) showRopCreateForm(crmId.trim());
   });
 
-  // Загрузка данных при входе
+  // 🔥 Загружаем список менеджеров при старте
+  loadRopManagers();
+
+  // Загрузка данных
   loadRopData();
 }
 
