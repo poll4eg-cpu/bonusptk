@@ -256,8 +256,6 @@ ropSupabaseClient
       <!-- остальное без изменений -->
     `;
 
-    // ... остальной код (обработчики, кнопка создания) ...
-  });
       // Обработчики ARPU/годовой контракт
       document.getElementById('ropDealType').addEventListener('change', () => {
         const isTO = document.getElementById('ropDealType').value === 'to';
