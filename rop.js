@@ -203,12 +203,13 @@ async function loadRopData() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td>${deal.crm_id}</td>
-          <td>${deal.manager_name}</td>
-          <td>${typeLabels[deal.deal_type] || deal.deal_type}</td>
-          <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-          <td>${bonusPaid.toLocaleString('ru-RU')} ₽</td>
-        `;
+        <td>${deal.crm_id}</td>
+        <td>${deal.manager_name}</td>
+        <td>${typeLabels[deal.deal_type] || deal.deal_type}</td>
+        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+        <td>${bonusPaid.toLocaleString('ru-RU')} ₽</td>
+        <td><button class="editDealBtn" data-crm-id="${deal.crm_id}">✏️ Ред.</button></td>
+      `;
         tbody.appendChild(row);
       });
 
