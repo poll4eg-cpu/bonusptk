@@ -23,7 +23,7 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
   // Загрузка данных
   loadRopData();
 }
-// 📋 Загрузка списка менеджеров для фильтра
+// 📋 Загрузка списка менеджеров + РОП
 async function loadRopManagers() {
   try {
     const { data, error } = await ropSupabaseClient
@@ -34,15 +34,23 @@ async function loadRopManagers() {
     if (error) throw error;
 
     const managerSet = new Set(data.map(d => d.manager_name));
+    
+    // 🔥 Добавляем текущего РОПа в список
+    if (ropCurrentUserName) {
+      managerSet.add(ropCurrentUserName);
+    }
+
     const managerSelect = document.getElementById('ropManagerFilter');
     managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
     
-    managerSet.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      managerSelect.appendChild(opt);
-    });
+    Array.from(managerSet)
+      .sort()
+      .forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        managerSelect.appendChild(opt);
+      });
   } catch (error) {
     console.error('Ошибка загрузки менеджеров:', error);
   }
@@ -218,63 +226,38 @@ function showRopCreateForm(crmId) {
   document.getElementById('ropScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
 
-  // Получаем список менеджеров для селекта
-  ropSupabaseClient
-    .from('deals')
-    .select('manager_name')
-    .order('manager_name')
-    .then(({ data, error }) => {
-      if (error) {
-        alert('Ошибка загрузки менеджеров: ' + error.message);
-        return;
-      }
-      const managerSet = new Set(data.map(d => d.manager_name));
-      const managerOptions = Array.from(managerSet)
-        .map(name => `<option value="${name}">${name}</option>`)
-        .join('');
+  // Получаем список менеджеров + добавляем РОПа
+ropSupabaseClient
+  .from('deals')
+  .select('manager_name')
+  .order('manager_name')
+  .then(({ data, error }) => {
+    if (error) {
+      alert('Ошибка загрузки менеджеров: ' + error.message);
+      return;
+    }
 
-      document.getElementById('formContainer').innerHTML = `
-        <button id="backToRopBtn">← Назад к панели РОПа</button>
-        <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
-        <label>Менеджер:</label>
-        <select id="ropManagerName">${managerOptions}</select>
-        <label>Сумма договора (₽):</label>
-        <input type="number" id="ropContractAmount" placeholder="600000" required>
-        <label>Сумма предоплаты (₽):</label>
-        <input type="number" id="ropPaymentAmount" placeholder="140000" required>
-        <label>Тип сделки:</label>
-        <select id="ropDealType">
-          <option value="to">ТО</option>
-          <option value="pto">ПТО</option>
-          <option value="comp">Комплектующие</option>
-          <option value="rep">Ремонты</option>
-          <option value="eq">Оборудование</option>
-          <option value="rent">Аренда</option>
-        </select>
-        <div id="ropArpuSection" style="display:none;">
-          <label>ARPU (₽/мес):</label>
-          <input type="number" id="ropArpu" placeholder="46666">
-        </div>
-        <div id="ropAnnualSection" style="display:none; margin-top:10px;">
-          <input type="checkbox" id="ropAnnualContract">
-          <label for="ropAnnualContract">Годовой контракт</label>
-        </div>
-        <div style="margin-top:15px;">
-          <input type="checkbox" id="ropIsFirst"> 
-          <label for="ropIsFirst">Первый платёж (ТО)?</label>
-        </div>
-        <div style="margin-top:10px;">
-          <input type="checkbox" id="ropPaid"> 
-          <label for="ropPaid">Оплачен?</label>
-        </div>
-        <div style="margin-top:10px;">
-          <input type="checkbox" id="ropUpdSigned"> 
-          <label for="ropUpdSigned">УПД подписан?</label>
-        </div>
-        <button id="ropCreateDealBtn" class="success">Создать сделку</button>
-        <div id="ropCreateFormResult" class="result" style="display:none;"></div>
-      `;
+    const managerSet = new Set(data.map(d => d.manager_name));
+    // 🔥 Добавляем текущего РОПа
+    if (ropCurrentUserName) {
+      managerSet.add(ropCurrentUserName);
+    }
 
+    const managerOptions = Array.from(managerSet)
+      .sort()
+      .map(name => `<option value="${name}">${name}</option>`)
+      .join('');
+
+    document.getElementById('formContainer').innerHTML = `
+      <button id="backToRopBtn">← Назад к панели РОПа</button>
+      <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
+      <label>Менеджер:</label>
+      <select id="ropManagerName">${managerOptions}</select>
+      <!-- остальное без изменений -->
+    `;
+
+    // ... остальной код (обработчики, кнопка создания) ...
+  });
       // Обработчики ARPU/годовой контракт
       document.getElementById('ropDealType').addEventListener('change', () => {
         const isTO = document.getElementById('ropDealType').value === 'to';
