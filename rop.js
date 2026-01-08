@@ -80,18 +80,15 @@ async function loadRopData() {
       'Аренда': 'rent'
     };
 
-    // Применяем фильтры
+    // Применяем оба фильтра одновременно
     let filteredData = data.filter(deal => deal.manager_name && deal.manager_name.trim() !== '');
-    
-    if (managerFilter) {
-      filteredData = filteredData.filter(deal => deal.manager_name.trim() === managerFilter);
-    }
-    
-    if (segmentFilter) {
-      const dealType = labelToType[segmentFilter];
-      if (dealType) {
-        filteredData = filteredData.filter(deal => deal.deal_type === dealType);
-      }
+
+    if (managerFilter || segmentFilter) {
+      filteredData = filteredData.filter(deal => {
+        const matchesManager = !managerFilter || deal.manager_name.trim() === managerFilter;
+        const matchesSegment = !segmentFilter || (labelToType[segmentFilter] && deal.deal_type === labelToType[segmentFilter]);
+        return matchesManager && matchesSegment;
+      });
     }
 
     // Заполняем таблицу
