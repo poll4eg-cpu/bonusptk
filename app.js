@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
-  // 👤 Авторизация
+ // 👤 Авторизация
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const phone = document.getElementById('loginPhone').value.trim();
   if (!phone) { alert('Введите номер телефона'); return; }
@@ -140,15 +140,13 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
   currentUserPhone = phone;
   currentUserName = data.name;
-  currentUserRole = data.role;
 
-  // 🔥 Правильная обработка РОПа
+  // 🔑 Если роль = 'rop' → загружаем панель РОПа
   if (data.role === 'rop') {
     document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('crmScreen').style.display = 'none';
     document.getElementById('ropScreen').style.display = 'block';
     
-    // Динамическая загрузка rop.js
+    // Динамически загружаем rop.js
     if (!window.ropModuleLoaded) {
       const script = document.createElement('script');
       script.src = 'rop.js';
@@ -612,4 +610,5 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
