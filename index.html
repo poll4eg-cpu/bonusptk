@@ -52,16 +52,17 @@
     <div id="mainApp" style="display:none;">
       <div id="formContainer"></div>
     </div>
-    <!-- 🔹 Полная панель РОПа -->
+   <!-- 🔹 Панель РОПа -->
 <div id="ropScreen" class="card" style="display:none;">
   <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
   
-  <!-- 💡 Блок итогов -->
+  <!-- 💡 Итоги -->
   <div id="ropSummary" class="result" style="display:none; padding:16px; text-align:left; margin-bottom:15px;">
     <h3>Итоги за период</h3>
     <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
     <p><strong>Премия РОПа:</strong> <span id="ropBonus">0</span> ₽</p>
     <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
+    <!-- Прогресс-бар -->
     <div id="ropPlanProgress" style="margin-top:12px; display:none;">
       <strong>Выполнение плана отдела:</strong>
       <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
@@ -71,6 +72,7 @@
     </div>
   </div>
 
+  <!-- Фильтры -->
   <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
     <div>
       <label>Менеджер:</label>
@@ -97,6 +99,7 @@
 
   <button id="ropCreateDealBtn">Создать сделку</button>
 
+  <!-- Таблица -->
   <div id="ropDealsTable" style="margin-top:20px; display:none;">
     <h3>Сделки отдела</h3>
     <table style="width:100%;">
@@ -106,7 +109,7 @@
           <th>Менеджер</th>
           <th>Тип</th>
           <th>Договор</th>
-          <th>Премия</th> <!-- ← новая колонка -->
+          <th>Премия</th>
         </tr>
       </thead>
       <tbody id="ropDealsBody"></tbody>
@@ -121,6 +124,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
+
 
 
 
