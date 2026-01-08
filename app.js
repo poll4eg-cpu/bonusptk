@@ -286,48 +286,57 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     </table>
   `;
 
-  // 💥 ДОБАВЛЯЕМ ТУРНИРНУЮ ТАБЛИЦУ
-  const ranking = await loadDepartmentRanking(currentUserPhone, now);
-  if (ranking.length > 1) {
-    let rankingHtml = `
-      <h4 style="margin-top:25px;">🏆 Рейтинг отдела (${ranking.length} менеджеров)</h4>
-      <table style="width:100%; font-size:14px; margin-top:10px;">
-        <thead>
-          <tr>
-            <th>Место</th>
-            <th>Менеджер</th>
-            <th>Маржа</th>
-            <th>% от плана</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+  // 🏆 Загрузка турнирной таблицы (только менеджеры)
+async function loadDepartmentRanking(currentMonth) {
+  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-    const basePlan = 800000;
-    const monthPlan = basePlan * coefficients[now.getMonth()];
+  // Загружаем все сделки
+  const { data: deals, error: dealsError } = await supabaseClient
+    .from('deals')
+    .select('manager_name, margin')
+    .gte('created_at', startOfMonth.toISOString())
+    .lte('created_at', endOfMonth.toISOString());
 
-    ranking.forEach(manager => {
-      const planPct = Math.round((manager.margin / monthPlan) * 100);
-      const isCurrentUser = manager.name === currentUserName;
-      rankingHtml += `
-        <tr style="${isCurrentUser ? 'background:#fffbe6;' : ''}">
-          <td><strong>${manager.rank}</strong></td>
-          <td>${manager.name}</td>
-          <td>${manager.margin.toLocaleString('ru-RU')} ₽</td>
-          <td>${planPct}%</td>
-        </tr>
-      `;
-    });
+  if (dealsError || !deals) return [];
 
-    rankingHtml += `</tbody></table>`;
-    resultDiv.innerHTML += rankingHtml;
+  // Получаем список менеджеров (только роль = 'manager')
+  const managerNames = [...new Set(deals.map(d => d.manager_name))];
+  const { data: users, error: usersError } = await supabaseClient
+    .from('allowed_users')
+    .select('name, role')
+    .in('name', managerNames);
+
+  if (usersError) {
+    console.error('Ошибка загрузки ролей:', usersError);
+    return [];
   }
+
+  // Фильтруем: только менеджеры
+  const managerNamesOnly = new Set(
+    users
+      .filter(user => user.role === 'manager')
+      .map(user => user.name)
+  );
+
+  // Считаем маржу только по менеджерам
+  const managerStats = {};
+  deals.forEach(deal => {
+    if (managerNamesOnly.has(deal.manager_name)) {
+      if (!managerStats[deal.manager_name]) {
+        managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
+      }
+      managerStats[deal.manager_name].margin += deal.margin || 0;
+    }
+  });
+
+  return Object.values(managerStats)
+    .sort((a, b) => b.margin - a.margin)
+    .map((manager, index) => ({
+      ...manager,
+      rank: index + 1
+    }));
 }
-
-  resultDiv.style.display = 'block';
-});
-
   // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
     const form = document.getElementById('feedbackForm');
@@ -612,6 +621,7 @@ async function loadDepartmentRanking(currentUserPhone, currentMonth) {
     }));
 }
 });
+
 
 
 
