@@ -23,6 +23,30 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
   // Загрузка данных
   loadRopData();
 }
+// 📋 Загрузка списка менеджеров для фильтра
+async function loadRopManagers() {
+  try {
+    const { data, error } = await ropSupabaseClient
+      .from('deals')
+      .select('manager_name')
+      .order('manager_name');
+
+    if (error) throw error;
+
+    const managerSet = new Set(data.map(d => d.manager_name));
+    const managerSelect = document.getElementById('ropManagerFilter');
+    managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
+    
+    managerSet.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      managerSelect.appendChild(opt);
+    });
+  } catch (error) {
+    console.error('Ошибка загрузки менеджеров:', error);
+  }
+}
 
 // 📊 Загрузка данных РОПа
 async function loadRopData() {
