@@ -114,6 +114,47 @@
     </table>
   </div>
 </div>
+    <!-- 🔹 Экран финансиста -->
+<div id="finScreen" class="card" style="display:none;">
+  <h2><i class="fas fa-chart-line"></i> Финансовый контроль</h2>
+  
+  <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+    <div>
+      <label>С:</label>
+      <input type="date" id="finDateFrom">
+    </div>
+    <div>
+      <label>По:</label>
+      <input type="date" id="finDateTo">
+    </div>
+    <div>
+      <label>Менеджер:</label>
+      <select id="finManagerFilter">
+        <option value="">Все менеджеры</option>
+      </select>
+    </div>
+    <button id="loadFinData">Загрузить</button>
+    <button id="backToRopFromFin" style="margin-left:auto;">← Назад к РОПу</button>
+  </div>
+
+  <div id="finDealsTable" style="display:none; margin-top:20px;">
+    <h3>Сделки с расходами</h3>
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f1f1f1;">
+          <th style="padding:8px; border:1px solid #ddd;">CRM ID</th>
+          <th style="padding:8px; border:1px solid #ddd;">Менеджер</th>
+          <th style="padding:8px; border:1px solid #ddd;">Теор. маржа</th>
+          <th style="padding:8px; border:1px solid #ddd;">Расходы</th>
+          <th style="padding:8px; border:1px solid #ddd;">Факт. маржа</th>
+          <th style="padding:8px; border:1px solid #ddd;">Откл. %</th>
+          <th style="padding:8px; border:1px solid #ddd;">Действия</th>
+        </tr>
+      </thead>
+      <tbody id="finDealsBody"></tbody>
+    </table>
+  </div>
+</div>
 
     <footer>Разработчик — Илья Галунин</footer>
   </div>
@@ -122,6 +163,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
+
 
 
 
