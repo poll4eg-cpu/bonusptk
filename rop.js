@@ -18,13 +18,14 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
 }
 
 async function loadRopData() {
-  console.log('Загрузка сделок...');
+  console.log('Загрузка сделок с фильтрами...');
   
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   try {
+    // Загружаем ВСЕ сделки за месяц
     const { data, error } = await ropSupabaseClient
       .from('deals')
       .select('crm_id, manager_name, deal_type, contract_amount')
@@ -32,16 +33,27 @@ async function loadRopData() {
       .lte('created_at', endOfMonth.toISOString());
 
     if (error) throw error;
-
     if (!data || data.length === 0) {
       alert('Нет сделок за месяц');
       return;
     }
 
-    // Получаем выбранный сегмент
+    // 🔥 Заполняем список менеджеров (все, у кого есть сделки)
+    const managerNames = [...new Set(data.map(d => d.manager_name))];
+    const managerSelect = document.getElementById('ropManagerFilter');
+    managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
+    managerNames.sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      managerSelect.appendChild(opt);
+    });
+
+    // Получаем текущие фильтры
+    const managerFilter = document.getElementById('ropManagerFilter').value;
     const segmentFilter = document.getElementById('ropSegmentFilter').value;
-    
-    // Сопоставление: "ТО" → "to", "Оборудование" → "eq" и т.д.
+
+    // Сопоставление сегментов
     const labelToType = {
       'ТО': 'to',
       'ПТО': 'pto',
@@ -51,11 +63,16 @@ async function loadRopData() {
       'Аренда': 'rent'
     };
 
-    // Фильтруем данные
+    // Применяем фильтры
     let filteredData = data;
+    
+    if (managerFilter) {
+      filteredData = filteredData.filter(deal => deal.manager_name === managerFilter);
+    }
+    
     if (segmentFilter) {
       const dealType = labelToType[segmentFilter];
-      filteredData = data.filter(deal => deal.deal_type === dealType);
+      filteredData = filteredData.filter(deal => deal.deal_type === dealType);
     }
 
     // Заполняем таблицу
