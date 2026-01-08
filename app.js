@@ -101,6 +101,7 @@ if (data.role === 'rop') {
 } else {
   document.getElementById('crmScreen').style.display = 'block';
 }
+  }); 
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -507,6 +508,7 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     }
   });
 });
+
 
 
 
