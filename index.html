@@ -10,23 +10,23 @@
 </head>
 <body>
   <div class="container">
+    <!-- Экран 1: Авторизация -->
     <div id="loginScreen" class="card">
-  <h1>Калькулятор премий</h1>
-  <label>Ваш рабочий номер телефона:</label>
-  <input type="text" id="loginPhone" placeholder="+79123456789">
-  
-  <!-- 🔑 Новое поле пароля -->
-  <div id="passwordField" style="display:none; margin-top:12px;">
-    <label>Пароль:</label>
-    <input type="password" id="loginPassword" placeholder="••••••••">
-  </div>
+      <h1>Калькулятор премий</h1>
+      <label>Ваш рабочий номер телефона:</label>
+      <input type="text" id="loginPhone" placeholder="+79123456789">
       
-  
-  <button id="loginBtn">Войти</button>
-  <div id="loginError" class="error-message"></div>
-</div>
+      <!-- Поле пароля (появляется после первого клика) -->
+      <div id="passwordField" style="display:none; margin-top:12px;">
+        <label>Пароль:</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      
+      <button id="loginBtn">Войти</button>
+      <div id="loginError" class="error-message"></div>
+    </div>
 
-    <!-- Экран 2: CRM -->
+    <!-- Экран 2: CRM (менеджер) -->
     <div id="crmScreen" class="card" style="display:none;">
       <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
       <label>Номер сделки в CRM (из Битрикс):</label>
@@ -48,111 +48,105 @@
       </div>
     </div>
 
-    <!-- Форма -->
+    <!-- Форма (создание/редактирование) -->
     <div id="mainApp" style="display:none;">
       <div id="formContainer"></div>
     </div>
-   <!-- 🔹 Экран РОПа -->
-<div id="ropScreen" class="card" style="display:none;">
-  <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
 
-  <!-- Кнопки -->
-  <div style="display:flex; gap:10px; margin-bottom:20px;">
-    <button id="showAnalyticsBtn" class="btn-primary" style="flex:1;">📊 Аналитика</button>
-    <button id="showCreateBtn" class="btn-success" style="flex:1;">💼 Внести сделку</button>
-    <button id="showAccessBtn" class="btn-warning" style="flex:1;">👥 Доступ</button>
-  </div>
-
-  <!-- Аналитика -->
-  <div id="analyticsBlock" style="display:none;">
-    <div class="filter-row" style="margin-bottom:15px;">
-      <select id="ropPeriod">
-        <option value="month">Месяц</option>
-        <option value="week">Неделя</option>
-        <option value="quarter">Квартал</option>
-        <option value="year">Год</option>
-      </select>
-      <button id="loadRopData">Загрузить</button>
-    </div>
-
-    <div id="ropSummary" class="result" style="display:none; padding:12px;">
-      <h4>Итоги</h4>
-      <p>Маржа: <span id="totalMarginRop">0</span> ₽</p>
-      <p>Премия РОПа: <span id="ropBonus">0</span> ₽</p>
-      <p>Сделок: <span id="totalDealsRop">0</span></p>
-      <div id="ropPlanProgress" style="margin-top:10px; display:none;">
-        <div style="background:#e6f7ff; height:8px; border-radius:4px;">
-          <div id="ropPlanBar" style="height:100%; background:#1890ff; width:0%; border-radius:4px;"></div>
+    <!-- 🔹 Экран РОПа -->
+    <div id="ropScreen" class="card" style="display:none;">
+      <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
+      
+      <div class="filter-row">
+        <div style="flex:1; min-width:150px;">
+          <label>Период:</label>
+          <select id="ropPeriod">
+            <option value="month">Текущий месяц</option>
+            <option value="week">Текущая неделя</option>
+            <option value="quarter">Текущий квартал</option>
+            <option value="year">Текущий год</option>
+          </select>
         </div>
-        <small id="ropPlanPercent">0%</small>
+        <div style="flex:1; min-width:150px;">
+          <label>&nbsp;</label>
+          <button id="loadRopData">Загрузить</button>
+        </div>
+      </div>
+
+      <button id="ropCreateDealBtn" class="btn-success" style="margin-top:15px; width:100%;">Создать сделку</button>
+
+      <div id="ropSummary" class="result" style="display:none; text-align:left; padding:16px;">
+        <h3>Итоги за период</h3>
+        <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
+        <p><strong>Премия РОПа:</strong> <span id="ropBonus">0</span> ₽</p>
+        <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
+        <!-- 🔵 Прогресс-бар плана отдела -->
+        <div id="ropPlanProgress" style="margin-top:12px; display:none;">
+          <strong>Выполнение плана отдела:</strong>
+          <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
+            <div id="ropPlanBar" style="height:100%; background:#1890ff; width:0%; border-radius:5px;"></div>
+          </div>
+          <small id="ropPlanPercent">0%</small>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <div style="flex:1; min-width:150px;">
+          <label>Менеджер:</label>
+          <select id="ropManagerFilter">
+            <option value="">Все менеджеры</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label>Сегмент:</label>
+          <select id="ropSegmentFilter">
+            <option value="">Все сегменты</option>
+            <option value="ТО">ТО</option>
+            <option value="ПТО">ПТО</option>
+            <option value="Оборудование">Оборудование</option>
+            <option value="Комплектующие">Комплектующие</option>
+            <option value="Ремонты">Ремонты</option>
+            <option value="Аренда">Аренда</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label>&nbsp;</label>
+          <button id="applyRopFilters">Применить</button>
+        </div>
+      </div>
+
+      <div id="managersAnalytics" class="analytics-card" style="display:none;">
+        <h4>Топ менеджеров</h4>
+        <div id="managersChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
+      </div>
+
+      <div id="segmentsAnalytics" class="analytics-card" style="display:none;">
+        <h4>Маржа по сегментам</h4>
+        <div id="segmentsChart" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
+      </div>
+
+      <div id="ropDealsTable" style="margin-top:20px; display:none;">
+        <h3>Сделки отдела</h3>
+        <div class="table-container">
+          <table id="ropDealsList" style="width:100%;">
+            <thead>
+              <tr>
+                <th>CRM ID</th>
+                <th>Менеджер</th>
+                <th>Тип</th>
+                <th>Договор</th>
+                <th>Маржа</th>
+                <th>Оплата</th>
+                <th>УПД</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="ropDealsBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="filter-row" style="margin-top:15px;">
-      <select id="ropManagerFilter"><option value="">Все менеджеры</option></select>
-      <select id="ropSegmentFilter">
-        <option value="">Все сегменты</option>
-        <option value="ТО">ТО</option>
-        <option value="ПТО">ПТО</option>
-        <option value="Оборудование">Оборудование</option>
-        <option value="Комплектующие">Комплектующие</option>
-        <option value="Ремонты">Ремонты</option>
-        <option value="Аренда">Аренда</option>
-      </select>
-      <button id="applyRopFilters">Применить</button>
-    </div>
-
-    <div id="ropDealsTable" style="margin-top:20px; display:none;">
-      <h4>Сделки</h4>
-      <table style="width:100%;">
-        <thead>
-          <tr>
-            <th>CRM</th><th>Менеджер</th><th>Тип</th><th>Договор</th><th>Маржа</th><th>Действия</th>
-          </tr>
-        </thead>
-        <tbody id="ropDealsBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Создание сделки -->
-  <div id="createDealBlock" style="display:none;">
-    <h4>Создать сделку</h4>
-    <input type="text" id="ropCrmId" placeholder="CRM ID" style="width:100%; margin-bottom:10px;">
-    <select id="ropManagerName" style="width:100%; margin-bottom:10px;">
-      <option value="">Выберите менеджера</option>
-    </select>
-    <input type="number" id="ropContractAmount" placeholder="Сумма договора" style="width:100%; margin-bottom:10px;">
-    <input type="number" id="ropPaymentAmount" placeholder="Сумма оплаты" style="width:100%; margin-bottom:10px;">
-    <select id="ropDealType" style="width:100%; margin-bottom:10px;">
-      <option value="to">ТО</option>
-      <option value="pto">ПТО</option>
-      <option value="comp">Комплектующие</option>
-      <option value="rep">Ремонты</option>
-      <option value="eq">Оборудование</option>
-      <option value="rent">Аренда</option>
-    </select>
-    <button id="ropCreateDealBtn" class="btn-success" style="width:100%;">Создать</button>
-    <div id="ropCreateResult" class="result" style="margin-top:10px;"></div>
-  </div>
-
-  <!-- Управление доступом -->
-  <div id="accessBlock" style="display:none;">
-    <h4>Добавить пользователя</h4>
-    <input type="text" id="newUserPhone" placeholder="Телефон" style="width:100%; margin-bottom:10px;">
-    <input type="text" id="newUserName" placeholder="Имя" style="width:100%; margin-bottom:10px;">
-    <select id="newUserRole" style="width:100%; margin-bottom:10px;">
-      <option value="manager">Менеджер</option>
-      <option value="rop">РОП</option>
-    </select>
-    <input type="password" id="newUserPassword" placeholder="Пароль" style="width:100%; margin-bottom:10px;">
-    <button id="addUserBtn" class="btn-success" style="width:100%;">Добавить</button>
-    <div id="accessResult" class="result" style="margin-top:10px;"></div>
-
-    <h4 style="margin-top:20px;">Список пользователей</h4>
-    <div id="usersList" style="margin-top:10px;"></div>
-  </div>
-</div>
     <footer>Разработчик — Илья Галунин</footer>
   </div>
 
@@ -160,9 +154,3 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
-
-
-
-
-
-
