@@ -117,87 +117,106 @@ async function loadRopData() {
     }
 
     // 💥 Загружаем ПОЛНЫЕ данные для расчёта маржи и премий
-    const {  fullDeals, error: fullError } = await ropSupabaseClient
-      .from('deals')
-      .select('crm_id, deal_type, contract_amount, margin, paid, up_signed, is_first, arpu_input, annual_contract')
-      .in('crm_id', filteredData.map(d => d.crm_id));
+    let fullDeals = [];
+    try {
+      const { data: fullData, error: fullError } = await ropSupabaseClient
+        .from('deals')
+        .select('crm_id, deal_type, contract_amount, margin, paid, up_signed, is_first, arpu_input, annual_contract')
+        .in('crm_id', filteredData.map(d => d.crm_id));
 
-    if (fullError) throw fullError;
+      if (fullError) throw fullError;
+      if (fullData && Array.isArray(fullData)) {
+        fullDeals = fullData;
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки полных данных:', err);
+    }
 
     const dealMap = {};
-    fullDeals.forEach(d => dealMap[d.crm_id] = d);
+    if (Array.isArray(fullDeals)) {
+      fullDeals.forEach(d => dealMap[d.crm_id] = d);
+    }
 
     // 🔥 Расчёт маржи отдела и премии РОПа
     let totalMargin = 0;
     filteredData.forEach(deal => {
       const fullDeal = dealMap[deal.crm_id];
-      totalMargin += fullDeal.margin || 0;
+      totalMargin += fullDeal?.margin || 0;
     });
 
     const cleanMargin = totalMargin * 0.78; // −22% НДС
     const ropBonus = Math.round(cleanMargin * 0.10); // 10%
 
-    // 💡 План отдела = кол-во менеджеров × 800k × сезон
+    // 💡 План отдела
     const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
     const seasonalCoefficient = coefficients[now.getMonth()];
-    
-    // Получаем список менеджеров из filteredData
     const managersInData = [...new Set(filteredData.map(d => d.manager_name).filter(name => name))];
     const departmentPlan = managersInData.length * 800000 * seasonalCoefficient;
     const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
 
     // 📊 Отображение итогов
-    document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
-    document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
-    document.getElementById('totalDealsRop').textContent = filteredData.length;
-    document.getElementById('ropPlanBar').style.width = planPercent + '%';
-    document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
-    document.getElementById('ropSummary').style.display = 'block';
-    document.getElementById('ropPlanProgress').style.display = 'block';
+    const totalMarginEl = document.getElementById('totalMarginRop');
+    const ropBonusEl = document.getElementById('ropBonus');
+    const totalDealsEl = document.getElementById('totalDealsRop');
+    const planBar = document.getElementById('ropPlanBar');
+    const planPercentEl = document.getElementById('ropPlanPercent');
+    const summary = document.getElementById('ropSummary');
+    const planProgress = document.getElementById('ropPlanProgress');
+
+    if (totalMarginEl) totalMarginEl.textContent = totalMargin.toLocaleString('ru-RU');
+    if (ropBonusEl) ropBonusEl.textContent = ropBonus.toLocaleString('ru-RU');
+    if (totalDealsEl) totalDealsEl.textContent = filteredData.length;
+    if (planBar) planBar.style.width = planPercent + '%';
+    if (planPercentEl) planPercentEl.textContent = planPercent.toFixed(1) + '%';
+    if (summary) summary.style.display = 'block';
+    if (planProgress) planProgress.style.display = 'block';
 
     // 📋 Заполнение таблицы с премиями
     const tbody = document.getElementById('ropDealsBody');
-    tbody.innerHTML = '';
+    if (tbody) {
+      tbody.innerHTML = '';
 
-    const typeLabels = {
-      'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
-      'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
-    };
+      const typeLabels = {
+        'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
+        'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
+      };
 
-    filteredData.forEach(deal => {
-      const fullDeal = dealMap[deal.crm_id];
-      let bonusPaid = 0;
+      filteredData.forEach(deal => {
+        const fullDeal = dealMap[deal.crm_id];
+        let bonusPaid = 0;
 
-      if (fullDeal && fullDeal.paid && fullDeal.up_signed) {
-        let revenueForBonus = fullDeal.contract_amount;
-        if (fullDeal.deal_type === 'to') {
-          const arpuValue = fullDeal.arpu_input || fullDeal.contract_amount / 12;
-          revenueForBonus = arpuValue;
+        if (fullDeal && fullDeal.paid && fullDeal.up_signed) {
+          let revenueForBonus = fullDeal.contract_amount;
+          if (fullDeal.deal_type === 'to') {
+            const arpuValue = fullDeal.arpu_input || fullDeal.contract_amount / 12;
+            revenueForBonus = arpuValue;
+          }
+          bonusPaid = calculateBonus(
+            fullDeal.deal_type,
+            revenueForBonus,
+            fullDeal.is_first,
+            fullDeal.paid,
+            fullDeal.up_signed,
+            fullDeal.annual_contract
+          );
         }
-        bonusPaid = calculateBonus(
-          fullDeal.deal_type,
-          revenueForBonus,
-          fullDeal.is_first,
-          fullDeal.paid,
-          fullDeal.up_signed,
-          fullDeal.annual_contract
-        );
-      }
 
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${deal.crm_id}</td>
-        <td>${deal.manager_name}</td>
-        <td>${typeLabels[deal.deal_type] || deal.deal_type}</td>
-        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-        <td>${bonusPaid.toLocaleString('ru-RU')} ₽</td>
-      `;
-      tbody.appendChild(row);
-    });
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${deal.crm_id}</td>
+          <td>${deal.manager_name}</td>
+          <td>${typeLabels[deal.deal_type] || deal.deal_type}</td>
+          <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
+          <td>${bonusPaid.toLocaleString('ru-RU')} ₽</td>
+        `;
+        tbody.appendChild(row);
+      });
 
-    document.getElementById('ropDealsTable').style.display = 'block';
+      const table = document.getElementById('ropDealsTable');
+      if (table) table.style.display = 'block';
+    }
   } catch (error) {
-    console.error('Ошибка:', error);
-    alert('Ошибка загрузки: ' + error.message);
+    console.error('Ошибка в loadRopData:', error);
+    alert('Ошибка: ' + error.message);
   }
 }
