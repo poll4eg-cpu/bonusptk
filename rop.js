@@ -23,6 +23,7 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
   // Загрузка данных
   loadRopData();
 }
+
 // 📋 Загрузка списка менеджеров + РОП
 async function loadRopManagers() {
   try {
@@ -105,61 +106,66 @@ async function loadRopData() {
       return;
     }
 
-// 💡 Сезонные коэффициенты
-const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-const seasonalCoefficient = coefficients[now.getMonth()];
+    // 💡 Сезонные коэффициенты
+    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+    const seasonalCoefficient = coefficients[now.getMonth()];
 
-// 💡 Уникальные менеджеры
-const managers = [...new Set(data.map(d => d.manager_name))];
-const managerCount = managers.length || 1;
+    // 💡 Уникальные менеджеры
+    const managers = [...new Set(data.map(d => d.manager_name))];
+    const managerCount = managers.length || 1;
 
-// 💡 План отдела = менеджеры × 800k × сезон
-const baseManagerPlan = 800000;
-const departmentPlan = managerCount * baseManagerPlan * seasonalCoefficient;
+    // 💡 План отдела = менеджеры × 800k × сезон
+    const baseManagerPlan = 800000;
+    const departmentPlan = managerCount * baseManagerPlan * seasonalCoefficient;
 
-// 💡 Расчёт маржи и премии
-let totalMargin = 0;
-data.forEach(deal => totalMargin += deal.margin || 0);
-const nds = totalMargin * 0.22;
-const cleanMargin = totalMargin - nds;
-const ropBonus = Math.round(cleanMargin * 0.10);
+    // 💡 Расчёт маржи и премии
+    let totalMargin = 0;
+    data.forEach(deal => totalMargin += deal.margin || 0);
+    const nds = totalMargin * 0.22;
+    const cleanMargin = totalMargin - nds;
+    const ropBonus = Math.round(cleanMargin * 0.10);
 
-// 💡 Прогресс выполнения
-const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
+    // 💡 Прогресс выполнения
+    const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
 
-// 💡 Отображение
-document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
-document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
-document.getElementById('totalDealsRop').textContent = data.length;
+    // 💡 Отображение
+    document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
+    document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
+    document.getElementById('totalDealsRop').textContent = data.length;
 
-// 🔵 Прогресс-бар
-document.getElementById('ropPlanBar').style.width = planPercent + '%';
-document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
-document.getElementById('ropPlanProgress').style.display = 'block';
+    // 🔵 Прогресс-бар
+    document.getElementById('ropPlanBar').style.width = planPercent + '%';
+    document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
+    document.getElementById('ropPlanProgress').style.display = 'block';
 
-document.getElementById('ropSummary').style.display = 'block';
-document.getElementById('ropDealsTable').style.display = 'block';
+    document.getElementById('ropSummary').style.display = 'block';
+    document.getElementById('ropDealsTable').style.display = 'block';
 
-// Аналитика по менеджерам
-const managersObj = {};
-data.forEach(d => {
-  if (!managersObj[d.manager_name]) managersObj[d.manager_name] = 0;
-  managersObj[d.manager_name] += d.margin || 0;
-});
-renderAnalyticsChart('managersChart', managersObj, totalMargin, 'manager-label');
+    // Аналитика по менеджерам
+    const managersObj = {};
+    data.forEach(d => {
+      if (!managersObj[d.manager_name]) managersObj[d.manager_name] = 0;
+      managersObj[d.manager_name] += d.margin || 0;
+    });
+    renderAnalyticsChart('managersChart', managersObj, totalMargin, 'manager-label');
 
-// Аналитика по сегментам
-const segments = {};
-const typeLabels = {'to':'ТО','pto':'ПТО','eq':'Оборудование','comp':'Комплектующие','rep':'Ремонты','rent':'Аренда'};
-data.forEach(d => {
-  const label = typeLabels[d.deal_type] || d.deal_type;
-  if (!segments[label]) segments[label] = 0;
-  segments[label] += d.margin || 0;
-});
-renderAnalyticsChart('segmentsChart', segments, totalMargin, 'segment-label');
+    // Аналитика по сегментам
+    const segments = {};
+    const typeLabels = {'to':'ТО','pto':'ПТО','eq':'Оборудование','comp':'Комплектующие','rep':'Ремонты','rent':'Аренда'};
+    data.forEach(d => {
+      const label = typeLabels[d.deal_type] || d.deal_type;
+      if (!segments[label]) segments[label] = 0;
+      segments[label] += d.margin || 0;
+    });
+    renderAnalyticsChart('segmentsChart', segments, totalMargin, 'segment-label');
 
-// Заполнение таблицы
-renderDealsTable(data, typeLabels);
+    // Заполнение таблицы
+    renderDealsTable(data, typeLabels);
+  } catch (error) {
+    console.error('Ошибка загрузки данных РОПа:', error);
+    alert('Ошибка: ' + error.message);
+  }
+}
 
 // 📊 Отображение аналитической карточки
 function renderAnalyticsChart(containerId, dataObj, total, labelClass) {
@@ -214,68 +220,68 @@ function showRopCreateForm(crmId) {
   document.getElementById('mainApp').style.display = 'block';
 
   // Получаем список менеджеров + добавляем РОПа
-ropSupabaseClient
-  .from('deals')
-  .select('manager_name')
-  .order('manager_name')
-  .then(({ data, error }) => {
-    if (error) {
-      alert('Ошибка загрузки менеджеров: ' + error.message);
-      return;
-    }
+  ropSupabaseClient
+    .from('deals')
+    .select('manager_name')
+    .order('manager_name')
+    .then(({ data, error }) => {
+      if (error) {
+        alert('Ошибка загрузки менеджеров: ' + error.message);
+        return;
+      }
 
-    const managerSet = new Set(data.map(d => d.manager_name));
-    // 🔥 Добавляем текущего РОПа
-    if (ropCurrentUserName) {
-      managerSet.add(ropCurrentUserName);
-    }
+      const managerSet = new Set(data.map(d => d.manager_name));
+      // 🔥 Добавляем текущего РОПа
+      if (ropCurrentUserName) {
+        managerSet.add(ropCurrentUserName);
+      }
 
-    const managerOptions = Array.from(managerSet)
-      .sort()
-      .map(name => `<option value="${name}">${name}</option>`)
-      .join('');
+      const managerOptions = Array.from(managerSet)
+        .sort()
+        .map(name => `<option value="${name}">${name}</option>`)
+        .join('');
 
-   document.getElementById('formContainer').innerHTML = `
-  <button id="backToRopBtn">← Назад к панели РОПа</button>
-  <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
-  <label>Менеджер:</label>
-  <select id="ropManagerName">${managerOptions}</select>
-  <label>Сумма договора (₽):</label>
-  <input type="number" id="ropContractAmount" placeholder="600000" required>
-  <label>Сумма предоплаты (₽):</label>
-  <input type="number" id="ropPaymentAmount" placeholder="140000" required>
-  <label>Тип сделки:</label>
-  <select id="ropDealType">
-    <option value="to">ТО</option>
-    <option value="pto">ПТО</option>
-    <option value="comp">Комплектующие</option>
-    <option value="rep">Ремонты</option>
-    <option value="eq">Оборудование</option>
-    <option value="rent">Аренда</option>
-  </select>
-  <div id="ropArpuSection" style="display:none;">
-    <label>ARPU (₽/мес):</label>
-    <input type="number" id="ropArpu" placeholder="46666">
-  </div>
-  <div id="ropAnnualSection" style="display:none; margin-top:10px;">
-    <input type="checkbox" id="ropAnnualContract">
-    <label for="ropAnnualContract">Годовой контракт</label>
-  </div>
-  <div style="margin-top:15px;">
-    <input type="checkbox" id="ropIsFirst"> 
-    <label for="ropIsFirst">Первый платёж (ТО)?</label>
-  </div>
-  <div style="margin-top:10px;">
-    <input type="checkbox" id="ropPaid"> 
-    <label for="ropPaid">Оплачен?</label>
-  </div>
-  <div style="margin-top:10px;">
-    <input type="checkbox" id="ropUpdSigned"> 
-    <label for="ropUpdSigned">УПД подписан?</label>
-  </div>
-  <button id="ropCreateDealBtn" class="success">Создать сделку</button>
-  <div id="ropCreateFormResult" class="result" style="display:none;"></div>
-`;
+      document.getElementById('formContainer').innerHTML = `
+        <button id="backToRopBtn">← Назад к панели РОПа</button>
+        <h3><i class="fas fa-plus-circle"></i> Создать сделку (РОП): ${crmId}</h3>
+        <label>Менеджер:</label>
+        <select id="ropManagerName">${managerOptions}</select>
+        <label>Сумма договора (₽):</label>
+        <input type="number" id="ropContractAmount" placeholder="600000" required>
+        <label>Сумма предоплаты (₽):</label>
+        <input type="number" id="ropPaymentAmount" placeholder="140000" required>
+        <label>Тип сделки:</label>
+        <select id="ropDealType">
+          <option value="to">ТО</option>
+          <option value="pto">ПТО</option>
+          <option value="comp">Комплектующие</option>
+          <option value="rep">Ремонты</option>
+          <option value="eq">Оборудование</option>
+          <option value="rent">Аренда</option>
+        </select>
+        <div id="ropArpuSection" style="display:none;">
+          <label>ARPU (₽/мес):</label>
+          <input type="number" id="ropArpu" placeholder="46666">
+        </div>
+        <div id="ropAnnualSection" style="display:none; margin-top:10px;">
+          <input type="checkbox" id="ropAnnualContract">
+          <label for="ropAnnualContract">Годовой контракт</label>
+        </div>
+        <div style="margin-top:15px;">
+          <input type="checkbox" id="ropIsFirst"> 
+          <label for="ropIsFirst">Первый платёж (ТО)?</label>
+        </div>
+        <div style="margin-top:10px;">
+          <input type="checkbox" id="ropPaid"> 
+          <label for="ropPaid">Оплачен?</label>
+        </div>
+        <div style="margin-top:10px;">
+          <input type="checkbox" id="ropUpdSigned"> 
+          <label for="ropUpdSigned">УПД подписан?</label>
+        </div>
+        <button id="ropCreateDealBtn" class="success">Создать сделку</button>
+        <div id="ropCreateFormResult" class="result" style="display:none;"></div>
+      `;
 
       // Обработчики ARPU/годовой контракт
       document.getElementById('ropDealType').addEventListener('change', () => {
