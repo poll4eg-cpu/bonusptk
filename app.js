@@ -5,6 +5,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentUserPhone = null;
   let currentUserName = null;
+  // 💡 Управление историей браузера
+function updateUrl(screenName) {
+  const newUrl = `${window.location.origin}/#${screenName}`;
+  window.history.pushState({ screen: screenName }, '', newUrl);
+}
+
+// Обработка нажатия «Назад»
+window.addEventListener('popstate', (event) => {
+  const screen = event.state?.screen || 'login';
+  showScreen(screen);
+  // При первой загрузке — определить экран из URL
+const screenFromUrl = window.location.hash.replace('#', '') || 'login';
+showScreen(screenFromUrl);
+});
+  // 💡 Переключение экранов по имени
+function showScreen(screenName) {
+  // Скрыть все экраны
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('crmScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'none';
+  
+  // Показать нужный
+  if (screenName === 'login') {
+    document.getElementById('loginScreen').style.display = 'block';
+  } else if (screenName === 'crm') {
+    document.getElementById('crmScreen').style.display = 'block';
+  } else if (screenName === 'form') {
+    document.getElementById('mainApp').style.display = 'block';
+  }
+  // ropScreen обрабатывается отдельно (в rop.js), поэтому пока не трогаем
+}
 
   // 📊 Расчёт премии
   function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
@@ -82,7 +113,7 @@ currentUserPhone = phone;
 currentUserName = data.name;
 currentUserRole = data.role;
 
-document.getElementById('loginScreen').style.display = 'none';
+showScreen('crm');
 
 if (data.role === 'rop') {
   document.getElementById('ropScreen').style.display = 'block';
@@ -99,7 +130,7 @@ if (data.role === 'rop') {
     document.head.appendChild(script);
   }
 } else {
-  document.getElementById('crmScreen').style.display = 'block';
+  updateUrl('crm');
 }
   }); 
 
@@ -326,8 +357,8 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
 
   // ➕ Форма создания
   function showCreateForm(crmId) {
-    document.getElementById('crmScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
+    showScreen('form');
+    updateUrl('form');
     document.getElementById('formContainer').innerHTML = `
       <button id="backBtn">← Назад к CRM ID</button>
       <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
@@ -540,9 +571,9 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
   // 🔙 Назад
   document.addEventListener('click', (e) => {
     if (e.target.id === 'backBtn') {
-      document.getElementById('mainApp').style.display = 'none';
-      document.getElementById('crmScreen').style.display = 'block';
-      document.getElementById('monthResult').style.display = 'none';
+      document.getElementById('monthResult').style.display = 'none'; // это доп. элемент — оставим
+      showScreen('crm');
+      updateUrl('crm');
     }
   });
   // 🏆 Загрузка турнирной таблицы отдела
@@ -581,6 +612,7 @@ async function loadDepartmentRanking(currentUserPhone, currentMonth) {
     }));
 }
 });
+
 
 
 
