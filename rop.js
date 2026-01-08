@@ -1,4 +1,4 @@
-// rop.js — минимальная панель РОПа
+// rop.js — минимальная панель РОПа (без ошибок)
 let ropSupabaseClient = null;
 let ropCurrentUserPhone = null;
 let ropCurrentUserName = null;
@@ -18,7 +18,7 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
 }
 
 async function loadRopData() {
-  console.log('Загрузка сделок с фильтром...');
+  console.log('Загрузка сделок...');
   
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -32,13 +32,13 @@ async function loadRopData() {
       .lte('created_at', endOfMonth.toISOString());
 
     if (error) throw error;
+
     if (!data || data.length === 0) {
-      document.getElementById('ropDealsTable').style.display = 'none';
       alert('Нет сделок за месяц');
       return;
     }
 
-    // 🔥 Получаем выбранный сегмент
+    // Получаем выбранный сегмент
     const segmentFilter = document.getElementById('ropSegmentFilter').value;
     
     // Сопоставление: "ТО" → "to", "Оборудование" → "eq" и т.д.
@@ -72,37 +72,6 @@ async function loadRopData() {
     };
 
     filteredData.forEach(deal => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${deal.crm_id}</td>
-        <td>${deal.manager_name}</td>
-        <td>${typeLabels[deal.deal_type] || deal.deal_type}</td>
-        <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-      `;
-      tbody.appendChild(row);
-    });
-
-    document.getElementById('ropDealsTable').style.display = 'block';
-  } catch (error) {
-    console.error('Ошибка:', error);
-    alert('Ошибка загрузки: ' + error.message);
-  }
-}
-
-    // Заполняем таблицу
-    const tbody = document.getElementById('ropDealsBody');
-    tbody.innerHTML = '';
-
-    const typeLabels = {
-      'to': 'ТО',
-      'pto': 'ПТО',
-      'eq': 'Оборудование',
-      'comp': 'Комплектующие',
-      'rep': 'Ремонты',
-      'rent': 'Аренда'
-    };
-
-    data.forEach(deal => {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${deal.crm_id}</td>
