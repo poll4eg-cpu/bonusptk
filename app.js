@@ -221,40 +221,78 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
         Сделок не найдено.
       </div>
     `;
-  } else {
-    resultDiv.innerHTML = `
-      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-        <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-        <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-        <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-        <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+} else {
+  resultDiv.innerHTML = `
+    <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+      <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+      <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+      <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+      <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
+    </div>
+    <!-- 🔵 Прогресс-бар -->
+    <div style="margin-top:12px;">
+      <strong>Выполнение плана:</strong>
+      <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
+        <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
       </div>
-      <!-- 🔵 Прогресс-бар -->
-      <div style="margin-top:12px;">
-        <strong>Выполнение плана:</strong>
-        <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
-          <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
-        </div>
-        <small>${planPercent.toFixed(1)}%</small>
-      </div>
-      <h4>Сделки (${deals.length} шт):</h4>
-      <table style="width:100%; font-size:14px;">
+      <small>${planPercent.toFixed(1)}%</small>
+    </div>
+    <h4>Сделки (${deals.length} шт):</h4>
+    <table style="width:100%; font-size:14px;">
+      <thead>
+        <tr>
+          <th>CRM ID</th>
+          <th>Тип</th>
+          <th>Договор</th>
+          <th>Оплата</th>
+          <th>Премия</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dealRows}
+      </tbody>
+    </table>
+  `;
+
+  // 💥 ДОБАВЛЯЕМ ТУРНИРНУЮ ТАБЛИЦУ
+  const ranking = await loadDepartmentRanking(currentUserPhone, now);
+  if (ranking.length > 1) {
+    let rankingHtml = `
+      <h4 style="margin-top:25px;">🏆 Рейтинг отдела (${ranking.length} менеджеров)</h4>
+      <table style="width:100%; font-size:14px; margin-top:10px;">
         <thead>
           <tr>
-            <th>CRM ID</th>
-            <th>Тип</th>
-            <th>Договор</th>
-            <th>Оплата</th>
-            <th>Премия</th>
+            <th>Место</th>
+            <th>Менеджер</th>
+            <th>Маржа</th>
+            <th>% от плана</th>
           </tr>
         </thead>
         <tbody>
-          ${dealRows}
-        </tbody>
-      </table>
     `;
+
+    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+    const basePlan = 800000;
+    const monthPlan = basePlan * coefficients[now.getMonth()];
+
+    ranking.forEach(manager => {
+      const planPct = Math.round((manager.margin / monthPlan) * 100);
+      const isCurrentUser = manager.name === currentUserName;
+      rankingHtml += `
+        <tr style="${isCurrentUser ? 'background:#fffbe6;' : ''}">
+          <td><strong>${manager.rank}</strong></td>
+          <td>${manager.name}</td>
+          <td>${manager.margin.toLocaleString('ru-RU')} ₽</td>
+          <td>${planPct}%</td>
+        </tr>
+      `;
+    });
+
+    rankingHtml += `</tbody></table>`;
+    resultDiv.innerHTML += rankingHtml;
   }
+}
 
   resultDiv.style.display = 'block';
 });
@@ -507,7 +545,43 @@ document.getElementById('checkMonthBtn').addEventListener('click', async () => {
       document.getElementById('monthResult').style.display = 'none';
     }
   });
+  // 🏆 Загрузка турнирной таблицы отдела
+async function loadDepartmentRanking(currentUserPhone, currentMonth) {
+  const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
+  const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
+  const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  // Загружаем всех менеджеров и их маржу
+  const { data, error } = await supabaseClient
+    .from('deals')
+    .select('manager_name, margin, contract_amount, paid')
+    .gte('created_at', startOfMonth.toISOString())
+    .lte('created_at', endOfMonth.toISOString());
+
+  if (error || !data) return [];
+
+  // Группируем по менеджеру
+  const managerStats = {};
+  data.forEach(deal => {
+    if (!managerStats[deal.manager_name]) {
+      managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
+    }
+    managerStats[deal.manager_name].margin += deal.margin || 0;
+  });
+
+  // Сортируем по марже (убывание)
+  return Object.values(managerStats)
+    .sort((a, b) => b.margin - a.margin)
+    .map((manager, index) => ({
+      ...manager,
+      rank: index + 1
+    }));
+}
 });
+
 
 
 
