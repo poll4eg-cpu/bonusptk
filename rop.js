@@ -105,74 +105,61 @@ async function loadRopData() {
       return;
     }
 
-    // Применение фильтров
-    const managerFilter = document.getElementById('ropManagerFilter').value;
-    const segmentFilter = document.getElementById('ropSegmentFilter').value;
-    let deals = data;
+// 💡 Сезонные коэффициенты
+const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+const seasonalCoefficient = coefficients[now.getMonth()];
 
-    if (managerFilter) {
-      deals = deals.filter(d => d.manager_name === managerFilter);
-    }
+// 💡 Уникальные менеджеры
+const managers = [...new Set(data.map(d => d.manager_name))];
+const managerCount = managers.length || 1;
 
-    if (segmentFilter) {
-      const typeMap = {
-        'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
-        'Комплектующие': 'comp', 'Ремонты': 'rep', 'Аренда': 'rent'
-      };
-      const dealType = typeMap[segmentFilter];
-      if (dealType) deals = deals.filter(d => d.deal_type === dealType);
-    }
+// 💡 План отдела = менеджеры × 800k × сезон
+const baseManagerPlan = 800000;
+const departmentPlan = managerCount * baseManagerPlan * seasonalCoefficient;
 
-    // Расчёт итогов
-    let totalMargin = 0;
-    deals.forEach(deal => totalMargin += deal.margin || 0);
-    const nds = totalMargin * 0.22;
-    const cleanMargin = totalMargin - nds;
-    const ropBonus = Math.round(cleanMargin * 0.10);
+// 💡 Расчёт маржи и премии
+let totalMargin = 0;
+data.forEach(deal => totalMargin += deal.margin || 0);
+const nds = totalMargin * 0.22;
+const cleanMargin = totalMargin - nds;
+const ropBonus = Math.round(cleanMargin * 0.10);
 
-    document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
-    document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
-    document.getElementById('totalDealsRop').textContent = deals.length;
-    document.getElementById('ropSummary').style.display = 'block';
-    document.getElementById('ropDealsTable').style.display = 'block';
-    // 💡 План отдела = 800 000 ₽ * 4 (например, для месяца)
-// Вы можете задать свой коэффициент
-const basePlan = 3200000; // 800k * 4 менеджера (пример)
-const planPercent = Math.min(100, (totalMargin / basePlan) * 100);
+// 💡 Прогресс выполнения
+const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
 
-// Отображаем прогресс
+// 💡 Отображение
+document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
+document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
+document.getElementById('totalDealsRop').textContent = data.length;
+
+// 🔵 Прогресс-бар
 document.getElementById('ropPlanBar').style.width = planPercent + '%';
 document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
 document.getElementById('ropPlanProgress').style.display = 'block';
 
-    // Аналитика по менеджерам
-    const managers = {};
-    deals.forEach(d => {
-      if (!managers[d.manager_name]) managers[d.manager_name] = 0;
-      managers[d.manager_name] += d.margin || 0;
-    });
-    renderAnalyticsChart('managersChart', managers, totalMargin, 'manager-label');
+document.getElementById('ropSummary').style.display = 'block';
+document.getElementById('ropDealsTable').style.display = 'block';
 
-    // Аналитика по сегментам
-    const segments = {};
-    const typeLabels = {
-      'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
-      'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
-    };
-    deals.forEach(d => {
-      const label = typeLabels[d.deal_type] || d.deal_type;
-      if (!segments[label]) segments[label] = 0;
-      segments[label] += d.margin || 0;
-    });
-    renderAnalyticsChart('segmentsChart', segments, totalMargin, 'segment-label');
+// Аналитика по менеджерам
+const managersObj = {};
+data.forEach(d => {
+  if (!managersObj[d.manager_name]) managersObj[d.manager_name] = 0;
+  managersObj[d.manager_name] += d.margin || 0;
+});
+renderAnalyticsChart('managersChart', managersObj, totalMargin, 'manager-label');
 
-    // Заполнение таблицы
-    renderDealsTable(deals, typeLabels);
-  } catch (error) {
-    console.error('Ошибка загрузки данных РОПа:', error);
-    alert('Ошибка: ' + error.message);
-  }
-}
+// Аналитика по сегментам
+const segments = {};
+const typeLabels = {'to':'ТО','pto':'ПТО','eq':'Оборудование','comp':'Комплектующие','rep':'Ремонты','rent':'Аренда'};
+data.forEach(d => {
+  const label = typeLabels[d.deal_type] || d.deal_type;
+  if (!segments[label]) segments[label] = 0;
+  segments[label] += d.margin || 0;
+});
+renderAnalyticsChart('segmentsChart', segments, totalMargin, 'segment-label');
+
+// Заполнение таблицы
+renderDealsTable(data, typeLabels);
 
 // 📊 Отображение аналитической карточки
 function renderAnalyticsChart(containerId, dataObj, total, labelClass) {
