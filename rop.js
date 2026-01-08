@@ -3,21 +3,93 @@ let ropSupabaseClient = null;
 let ropCurrentUserPhone = null;
 let ropCurrentUserName = null;
 
-// Инициализация панели РОПа
-if (data.role === 'rop') {
-  document.getElementById('ropScreen').style.display = 'block';
-  if (!window.ropModuleLoaded) {
-    const script = document.createElement('script');
-    script.src = 'rop.js';
-    script.onload = () => {
-      if (typeof initRopPanel === 'function') {
-        initRopPanel(supabaseClient, currentUserPhone, currentUserName); // ← клиент передаётся
-      }
-      window.ropModuleLoaded = true;
-    };
-    document.head.appendChild(script);
+// ➕ Добавление пользователя
+async function addUser() {
+  const phone = document.getElementById('newUserPhone').value.trim();
+  const name = document.getElementById('newUserName').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const password = document.getElementById('newUserPassword').value.trim();
+
+  if (!phone || !name || !password) {
+    alert('Заполните все поля');
+    return;
+  }
+
+  try {
+    const { error } = await ropSupabaseClient
+      .from('allowed_users')
+      .insert([{ phone, name, role, password, created_at: new Date().toISOString() }]);
+
+    if (error) throw error;
+
+    document.getElementById('accessResult').innerHTML = '✅ Пользователь добавлен!';
+    document.getElementById('newUserPhone').value = '';
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserPassword').value = '';
+    
+    loadUsersList(); // обновить список
+    setTimeout(() => document.getElementById('accessResult').innerHTML = '', 2000);
+  } catch (error) {
+    console.error('Ошибка добавления:', error);
+    alert('Ошибка: ' + error.message);
   }
 }
+
+// 📋 Загрузка списка пользователей
+async function loadUsersList() {
+  try {
+    const { data, error } = await ropSupabaseClient
+      .from('allowed_users')
+      .select('phone, name, role')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const listDiv = document.getElementById('usersList');
+    listDiv.innerHTML = '';
+
+    data.forEach(user => {
+      // Нельзя удалить самого себя
+      const canDelete = user.phone !== ropCurrentUserPhone;
+      listDiv.innerHTML += `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
+          <div>
+            <strong>${user.name}</strong><br>
+            <small>${user.phone} • ${user.role === 'rop' ? 'РОП' : 'Менеджер'}</small>
+          </div>
+          ${canDelete ? `<button class="deleteUserBtn" data-phone="${user.phone}" style="background:#ff4d4f; color:white; border:none; padding:4px 8px; border-radius:4px;">Удалить</button>` : ''}
+        </div>
+      `;
+    });
+
+    // Обработчик удаления
+    document.querySelectorAll('.deleteUserBtn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Удалить пользователя? Это действие нельзя отменить.')) return;
+        const phone = btn.getAttribute('data-phone');
+        try {
+          const { error } = await ropSupabaseClient
+            .from('allowed_users')
+            .delete()
+            .eq('phone', phone);
+          if (error) throw error;
+          loadUsersList();
+        } catch (error) {
+          alert('Ошибка удаления: ' + error.message);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Ошибка загрузки списка:', error);
+    document.getElementById('usersList').innerHTML = '<p>Ошибка загрузки</p>';
+  }
+}
+
+// Инициализация панели РОПа
+function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
+  ropSupabaseClient = supabaseClient;
+  ropCurrentUserPhone = currentUserPhone;
+  ropCurrentUserName = currentUserName;
 
   // Привязка обработчиков
   document.getElementById('loadRopData').addEventListener('click', loadRopData);
@@ -26,6 +98,17 @@ if (data.role === 'rop') {
     const crmId = prompt('Введите номер сделки из CRM:');
     if (crmId) showRopCreateForm(crmId.trim());
   });
+
+  // 🔐 Управление доступом
+  document.getElementById('manageAccessBtn').addEventListener('click', () => {
+    const accessPanel = document.getElementById('accessManagement');
+    accessPanel.style.display = accessPanel.style.display === 'none' ? 'block' : 'none';
+    if (accessPanel.style.display === 'block') {
+      loadUsersList();
+    }
+  });
+
+  document.getElementById('addUserBtn').addEventListener('click', addUser);
 
   // 🔥 Загружаем список менеджеров при старте
   loadRopManagers();
