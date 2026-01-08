@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Тест финансиста</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+  <h2>Тест отправки расходов</h2>
+  <input type="text" id="crmId" placeholder="CRM ID">
+  <input type="number" id="expenses" placeholder="Расходы">
+  <button id="saveBtn">Сохранить</button>
+  <div id="result"></div>
+
+  <script>
+    const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
+    const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
+    const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const crmId = document.getElementById('crmId').value.trim();
+      const expenses = parseFloat(document.getElementById('expenses').value);
+
+      if (!crmId || isNaN(expenses)) {
+        alert('Заполните все поля');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('finance_expenses')
+        .upsert({
+          crm_id: crmId,
+          fact_expenses: expenses,
+          updated_by: 'test',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'crm_id' });
+
+      if (error) {
+        document.getElementById('result').innerHTML = '❌ Ошибка: ' + error.message;
+      } else {
+        document  .getElementById('result').innerHTML = '✅ Успешно сохранено!';
+      }
+    });
+  </script>
+</body>
+</html>
