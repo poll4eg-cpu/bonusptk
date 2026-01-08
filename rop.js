@@ -15,6 +15,56 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
   document.getElementById('ropCreateDealBtn').addEventListener('click', () => {
     alert('Создание сделки — будет реализовано позже');
   });
+
+  // 💡 Загружаем список менеджеров при инициализации
+  loadManagerList();
+}
+
+// 🔁 Функция загрузки списка менеджеров
+async function loadManagerList() {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  try {
+    const { data, error } = await ropSupabaseClient
+      .from('deals')
+      .select('manager_name')
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+
+    if (error) throw error;
+
+    // Получаем уникальные имена
+    const managerNames = [...new Set(
+      data
+        .map(d => d.manager_name)
+        .filter(name => name && name.trim() !== '')
+    )];
+
+    console.log('Найденные имена менеджеров:', managerNames);
+
+    // Заполняем выпадающий список
+    const managerSelect = document.getElementById('ropManagerFilter');
+    managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
+    
+    if (managerNames.length === 0) {
+      console.warn('Ни у одной сделки не указан manager_name!');
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = '— нет данных —';
+      managerSelect.appendChild(opt);
+    } else {
+      managerNames.sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name.trim();
+        opt.textContent = name.trim();
+        managerSelect.appendChild(opt);
+      });
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки списка менеджеров:', error);
+  }
 }
 
 async function loadRopData() {
@@ -36,34 +86,6 @@ async function loadRopData() {
     if (!data || data.length === 0) {
       alert('Нет сделок за месяц');
       return;
-    }
-
-    // 🔥 Фильтруем только НЕПУСТЫЕ имена
-    const managerNames = [...new Set(
-      data
-        .map(d => d.manager_name)
-        .filter(name => name && name.trim() !== '')
-    )];
-
-    console.log('Найденные имена менеджеров:', managerNames);
-
-    // Заполняем список менеджеров
-    const managerSelect = document.getElementById('ropManagerFilter');
-    managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
-    
-    if (managerNames.length === 0) {
-      console.warn('Ни у одной сделки не указан manager_name!');
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = '— нет данных —';
-      managerSelect.appendChild(opt);
-    } else {
-      managerNames.sort().forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name.trim();
-        opt.textContent = name.trim();
-        managerSelect.appendChild(opt);
-      });
     }
 
     // Получаем текущие фильтры
