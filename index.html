@@ -56,18 +56,28 @@
 <div id="ropScreen" class="card" style="display:none;">
   <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
   
- <div style="margin-bottom:15px;">
-  <label>Сегмент:</label>
-  <select id="ropSegmentFilter">
-    <option value="">Все сегменты</option>
-    <option value="ТО">ТО</option>
-    <option value="ПТО">ПТО</option>
-    <option value="Оборудование">Оборудование</option>
-    <option value="Комплектующие">Комплектующие</option>
-    <option value="Ремонты">Ремонты</option>
-    <option value="Аренда">Аренда</option>
-  </select>
-  <button id="loadRopData">Загрузить</button>
+<div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
+  <div>
+    <label>Менеджер:</label>
+    <select id="ropManagerFilter">
+      <option value="">Все менеджеры</option>
+    </select>
+  </div>
+  <div>
+    <label>Сегмент:</label>
+    <select id="ropSegmentFilter">
+      <option value="">Все сегменты</option>
+      <option value="ТО">ТО</option>
+      <option value="ПТО">ПТО</option>
+      <option value="Оборудование">Оборудование</option>
+      <option value="Комплектующие">Комплектующие</option>
+      <option value="Ремонты">Ремонты</option>
+      <option value="Аренда">Аренда</option>
+    </select>
+  </div>
+  <div style="align-self:flex-end;">
+    <button id="loadRopData">Загрузить</button>
+  </div>
 </div>
 
 <button id="ropCreateDealBtn">Создать сделку</button>
@@ -95,6 +105,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
+
 
 
 
