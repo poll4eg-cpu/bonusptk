@@ -4,10 +4,20 @@ let ropCurrentUserPhone = null;
 let ropCurrentUserName = null;
 
 // Инициализация панели РОПа
-function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
-  ropSupabaseClient = supabaseClient;
-  ropCurrentUserPhone = currentUserPhone;
-  ropCurrentUserName = currentUserName;
+if (data.role === 'rop') {
+  document.getElementById('ropScreen').style.display = 'block';
+  if (!window.ropModuleLoaded) {
+    const script = document.createElement('script');
+    script.src = 'rop.js';
+    script.onload = () => {
+      if (typeof initRopPanel === 'function') {
+        initRopPanel(supabaseClient, currentUserPhone, currentUserName); // ← клиент передаётся
+      }
+      window.ropModuleLoaded = true;
+    };
+    document.head.appendChild(script);
+  }
+}
 
   // Привязка обработчиков
   document.getElementById('loadRopData').addEventListener('click', loadRopData);
