@@ -38,16 +38,33 @@ async function loadRopData() {
       return;
     }
 
-    // 🔥 Заполняем список менеджеров (все, у кого есть сделки)
-    const managerNames = [...new Set(data.map(d => d.manager_name))];
+    // 🔥 Фильтруем только НЕПУСТЫЕ имена
+    const managerNames = [...new Set(
+      data
+        .map(d => d.manager_name)
+        .filter(name => name && name.trim() !== '')
+    )];
+
+    console.log('Найденные имена менеджеров:', managerNames);
+
+    // Заполняем список менеджеров
     const managerSelect = document.getElementById('ropManagerFilter');
     managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
-    managerNames.sort().forEach(name => {
+    
+    if (managerNames.length === 0) {
+      console.warn('Ни у одной сделки не указан manager_name!');
       const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
+      opt.value = '';
+      opt.textContent = '— нет данных —';
       managerSelect.appendChild(opt);
-    });
+    } else {
+      managerNames.sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name.trim();
+        opt.textContent = name.trim();
+        managerSelect.appendChild(opt);
+      });
+    }
 
     // Получаем текущие фильтры
     const managerFilter = document.getElementById('ropManagerFilter').value;
@@ -64,15 +81,17 @@ async function loadRopData() {
     };
 
     // Применяем фильтры
-    let filteredData = data;
+    let filteredData = data.filter(deal => deal.manager_name && deal.manager_name.trim() !== '');
     
     if (managerFilter) {
-      filteredData = filteredData.filter(deal => deal.manager_name === managerFilter);
+      filteredData = filteredData.filter(deal => deal.manager_name.trim() === managerFilter);
     }
     
     if (segmentFilter) {
       const dealType = labelToType[segmentFilter];
-      filteredData = filteredData.filter(deal => deal.deal_type === dealType);
+      if (dealType) {
+        filteredData = filteredData.filter(deal => deal.deal_type === dealType);
+      }
     }
 
     // Заполняем таблицу
