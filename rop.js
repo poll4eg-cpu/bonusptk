@@ -27,7 +27,7 @@ async function addUser() {
     document.getElementById('newUserName').value = '';
     document.getElementById('newUserPassword').value = '';
     
-    loadUsersList(); // обновить список
+    loadUsersList();
     setTimeout(() => document.getElementById('accessResult').innerHTML = '', 2000);
   } catch (error) {
     console.error('Ошибка добавления:', error);
@@ -49,7 +49,6 @@ async function loadUsersList() {
     listDiv.innerHTML = '';
 
     data.forEach(user => {
-      // Нельзя удалить самого себя
       const canDelete = user.phone !== ropCurrentUserPhone;
       listDiv.innerHTML += `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
@@ -62,7 +61,6 @@ async function loadUsersList() {
       `;
     });
 
-    // Обработчик удаления
     document.querySelectorAll('.deleteUserBtn').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Удалить пользователя? Это действие нельзя отменить.')) return;
@@ -85,38 +83,6 @@ async function loadUsersList() {
   }
 }
 
-// Инициализация панели РОПа
-function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
-  ropSupabaseClient = supabaseClient;
-  ropCurrentUserPhone = currentUserPhone;
-  ropCurrentUserName = currentUserName;
-
-  // Привязка обработчиков
-  document.getElementById('loadRopData').addEventListener('click', loadRopData);
-  document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
-  document.getElementById('ropCreateDealBtn').addEventListener('click', () => {
-    const crmId = prompt('Введите номер сделки из CRM:');
-    if (crmId) showRopCreateForm(crmId.trim());
-  });
-
-  // 🔐 Управление доступом
-  document.getElementById('manageAccessBtn').addEventListener('click', () => {
-    const accessPanel = document.getElementById('accessManagement');
-    accessPanel.style.display = accessPanel.style.display === 'none' ? 'block' : 'none';
-    if (accessPanel.style.display === 'block') {
-      loadUsersList();
-    }
-  });
-
-  document.getElementById('addUserBtn').addEventListener('click', addUser);
-
-  // 🔥 Загружаем список менеджеров при старте
-  loadRopManagers();
-
-  // Загрузка данных
-  loadRopData();
-}
-
 // 📋 Загрузка списка менеджеров + РОП
 async function loadRopManagers() {
   try {
@@ -128,8 +94,6 @@ async function loadRopManagers() {
     if (error) throw error;
 
     const managerSet = new Set(data.map(d => d.manager_name));
-    
-    // 🔥 Добавляем текущего РОПа в список
     if (ropCurrentUserName) {
       managerSet.add(ropCurrentUserName);
     }
@@ -199,34 +163,24 @@ async function loadRopData() {
       return;
     }
 
-    // 💡 Сезонные коэффициенты
     const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
     const seasonalCoefficient = coefficients[now.getMonth()];
-
-    // 💡 Уникальные менеджеры
     const managers = [...new Set(data.map(d => d.manager_name))];
     const managerCount = managers.length || 1;
-
-    // 💡 План отдела = менеджеры × 800k × сезон
     const baseManagerPlan = 800000;
     const departmentPlan = managerCount * baseManagerPlan * seasonalCoefficient;
 
-    // 💡 Расчёт маржи и премии
     let totalMargin = 0;
     data.forEach(deal => totalMargin += deal.margin || 0);
     const nds = totalMargin * 0.22;
     const cleanMargin = totalMargin - nds;
     const ropBonus = Math.round(cleanMargin * 0.10);
-
-    // 💡 Прогресс выполнения
     const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
 
-    // 💡 Отображение
     document.getElementById('totalMarginRop').textContent = totalMargin.toLocaleString('ru-RU');
     document.getElementById('ropBonus').textContent = ropBonus.toLocaleString('ru-RU');
     document.getElementById('totalDealsRop').textContent = data.length;
 
-    // 🔵 Прогресс-бар
     document.getElementById('ropPlanBar').style.width = planPercent + '%';
     document.getElementById('ropPlanPercent').textContent = planPercent.toFixed(1) + '%';
     document.getElementById('ropPlanProgress').style.display = 'block';
@@ -234,7 +188,6 @@ async function loadRopData() {
     document.getElementById('ropSummary').style.display = 'block';
     document.getElementById('ropDealsTable').style.display = 'block';
 
-    // Аналитика по менеджерам
     const managersObj = {};
     data.forEach(d => {
       if (!managersObj[d.manager_name]) managersObj[d.manager_name] = 0;
@@ -242,7 +195,6 @@ async function loadRopData() {
     });
     renderAnalyticsChart('managersChart', managersObj, totalMargin, 'manager-label');
 
-    // Аналитика по сегментам
     const segments = {};
     const typeLabels = {'to':'ТО','pto':'ПТО','eq':'Оборудование','comp':'Комплектующие','rep':'Ремонты','rent':'Аренда'};
     data.forEach(d => {
@@ -252,7 +204,6 @@ async function loadRopData() {
     });
     renderAnalyticsChart('segmentsChart', segments, totalMargin, 'segment-label');
 
-    // Заполнение таблицы
     renderDealsTable(data, typeLabels);
   } catch (error) {
     console.error('Ошибка загрузки данных РОПа:', error);
@@ -312,7 +263,6 @@ function showRopCreateForm(crmId) {
   document.getElementById('ropScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
 
-  // Получаем список менеджеров + добавляем РОПа
   ropSupabaseClient
     .from('deals')
     .select('manager_name')
@@ -324,7 +274,6 @@ function showRopCreateForm(crmId) {
       }
 
       const managerSet = new Set(data.map(d => d.manager_name));
-      // 🔥 Добавляем текущего РОПа
       if (ropCurrentUserName) {
         managerSet.add(ropCurrentUserName);
       }
@@ -376,7 +325,6 @@ function showRopCreateForm(crmId) {
         <div id="ropCreateFormResult" class="result" style="display:none;"></div>
       `;
 
-      // Обработчики ARPU/годовой контракт
       document.getElementById('ropDealType').addEventListener('change', () => {
         const isTO = document.getElementById('ropDealType').value === 'to';
         document.getElementById('ropArpuSection').style.display = isTO ? 'block' : 'none';
@@ -384,7 +332,6 @@ function showRopCreateForm(crmId) {
       });
       document.getElementById('ropDealType').dispatchEvent(new Event('change'));
 
-      // Создание сделки
       document.getElementById('ropCreateDealBtn').addEventListener('click', async () => {
         const managerName = document.getElementById('ropManagerName').value;
         const contractAmount = parseFloat(document.getElementById('ropContractAmount').value);
@@ -540,7 +487,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// 📊 Расчёт премии (клон из app.js для изоляции)
+// 📊 Расчёт премии
 function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
   if (!paid || !upSigned) return 0;
   if (dealType === 'to') {
@@ -567,4 +514,33 @@ function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContra
   if (dealType === 'eq') return Math.round(revenue * 0.01);
   if (dealType === 'rent') return 1500;
   return 0;
+}
+
+// 💡 ЕДИНСТВЕННАЯ ТОЧКА ВХОДА
+function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
+  ropSupabaseClient = supabaseClient;
+  ropCurrentUserPhone = currentUserPhone;
+  ropCurrentUserName = currentUserName;
+
+  // 🔹 Основные обработчики
+  document.getElementById('loadRopData').addEventListener('click', loadRopData);
+  document.getElementById('applyRopFilters').addEventListener('click', loadRopData);
+  document.getElementById('ropCreateDealBtn').addEventListener('click', () => {
+    const crmId = prompt('Введите номер сделки из CRM:');
+    if (crmId) showRopCreateForm(crmId.trim());
+  });
+
+  // 🔐 Управление доступом
+  document.getElementById('manageAccessBtn').addEventListener('click', () => {
+    const accessPanel = document.getElementById('accessManagement');
+    accessPanel.style.display = accessPanel.style.display === 'none' ? 'block' : 'none';
+    if (accessPanel.style.display === 'block') {
+      loadUsersList();
+    }
+  });
+  document.getElementById('addUserBtn').addEventListener('click', addUser);
+
+  // Загрузка
+  loadRopManagers();
+  loadRopData();
 }
