@@ -104,57 +104,68 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 👤 Авторизация
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const phone = document.getElementById('loginPhone').value.trim();
-    if (!phone) { alert('Введите номер телефона'); return; }
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { alert('Введите номер телефона'); return; }
 
-    const passwordField = document.getElementById('passwordField');
-    if (passwordField.style.display !== 'block') {
-      passwordField.style.display = 'block';
-      document.getElementById('loginPassword').focus();
-      document.getElementById('loginBtn').textContent = 'Войти';
-      return;
+  const passwordField = document.getElementById('passwordField');
+  if (passwordField.style.display !== 'block') {
+    passwordField.style.display = 'block';
+    document.getElementById('loginPassword').focus();
+    document.getElementById('loginBtn').textContent = 'Войти';
+    return;
+  }
+
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!password) { alert('Введите пароль'); return; }
+
+  const { data, error } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role, password')
+    .eq('phone', phone)
+    .single();
+
+  if (error || !data) {
+    document.getElementById('loginError').textContent = 'Номер не найден.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  if (password !== data.password) {
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').textContent = 'Неверный пароль.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  currentUserPhone = phone;
+  currentUserName = data.name;
+  currentUserRole = data.role;
+
+  // 🔥 Правильная обработка РОПа
+  if (data.role === 'rop') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('crmScreen').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
+    
+    // Динамическая загрузка rop.js
+    if (!window.ropModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'rop.js';
+      script.onload = () => {
+        if (typeof initRopPanel === 'function') {
+          initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.ropModuleLoaded = true;
+      };
+      document.head.appendChild(script);
     }
-
-    const password = document.getElementById('loginPassword').value.trim();
-    if (!password) { alert('Введите пароль'); return; }
-
-    const { data, error } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name, role, password')
-      .eq('phone', phone)
-      .single();
-
-    if (error || !data) {
-      document.getElementById('loginError').textContent = 'Номер не найден.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-
-    if (password !== data.password) {
-      document.getElementById('loginPassword').value = '';
-      document.getElementById('loginError').textContent = 'Неверный пароль.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-
-    currentUserPhone = phone;
-    currentUserName = data.name;
-    currentUserRole = data.role;
-
-    if (data.role === 'rop') {
-      document.getElementById('loginScreen').style.display = 'none';
-      if (document.getElementById('ropScreen')) {
-        document.getElementById('ropScreen').style.display = 'block';
-        // Подключите rop.js позже, если нужно
-      } else {
-        alert('Панель РОПа не настроена. Обратитесь к разработчику.');
-      }
-    } else {
-      showScreen('crm');
-      updateUrl('crm');
-    }
-  });
+  } else {
+    // Обычный менеджер
+    showScreen('crm');
+    updateUrl('crm');
+  }
+});
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -601,3 +612,4 @@ document.addEventListener('DOMContentLoaded', () => {
     showScreen(screen);
   });
 });
+
