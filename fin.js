@@ -87,26 +87,26 @@ async function loadFinData() {
 
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
-    <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
-    <td style="padding:8px; border:1px solid #ddd;">${contractAmount.toLocaleString('ru-RU')} ₽</td>
-    <td style="padding:8px; border:1px solid #ddd;">
-      <input type="number" class="factExpensesInput" 
-             data-crm-id="${deal.crm_id}" 
-             value="${factExpenses}" 
-             placeholder="0"
-             style="width:100px; padding:4px;">
-      <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
-              style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
-        ✔️
-      </button>
-    </td>
-    <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
-    <td style="padding:8px; border:1px solid #ddd; color:${deviation > 30 ? '#ff4d4f' : '#52c41a'};">
-      ${deviation}%
-    </td>
-    <td style="padding:8px; border:1px solid #ddd;"></td>
-  `;
+  <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
+  <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
+  <td style="padding:8px; border:1px solid #ddd;">${theorMargin.toLocaleString('ru-RU')} ₽</td>
+  <td style="padding:8px; border:1px solid #ddd;">
+    <input type="number" class="factExpensesInput" 
+           data-crm-id="${deal.crm_id}" 
+           value="${factExpenses}" 
+           placeholder="0"
+           style="width:100px; padding:4px;">
+    <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
+            style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
+      ✔️
+    </button>
+  </td>
+  <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
+  <td style="padding:8px; border:1px solid #ddd; color:${deviation > 0 ? '#ff4d4f' : '#52c41a'};">
+    ${deviation > 0 ? '+' : ''}${deviation}%
+  </td>
+  <td style="padding:8px; border:1px solid #ddd;"></td>
+`;
   tbody.appendChild(row);
 });
 
