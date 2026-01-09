@@ -6,8 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <!-- Загружаем модули в правильном порядке -->
+  <script src="fin.js"></script>
+  <script src="rop.js"></script>
   <script src="app.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -49,10 +53,9 @@
       </div>
     </div>
 
-    <!-- Форма создания/редактирования -->
-    <div id="mainApp" style="display:none;">
-      <div id="formContainer"></div>
-    </div>
+    <!-- Контейнеры для форм создания/редактирования -->
+    <div id="createDealForm" style="display: none;"></div>
+    <div id="editDealForm" style="display: none;"></div>
 
     <!-- 🔹 Панель РОПа -->
     <div id="ropScreen" class="card" style="display:none;">
@@ -221,8 +224,5 @@
 
     <footer>Разработчик — Илья Галунин</footer>
   </div>
-
-  <!-- Иконки -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
 </body>
 </html>
