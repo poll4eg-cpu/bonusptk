@@ -359,6 +359,28 @@ function showRopCreateForm() {
       });
     });
 }
+  // Кнопка перехода к финансисту
+const goToFinBtn = document.getElementById('goToFin');
+if (goToFinBtn) {
+  goToFinBtn.addEventListener('click', () => {
+    document.getElementById('ropScreen').style.display = 'none';
+    document.getElementById('finScreen').style.display = 'block';
+    
+    if (!window.finModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'fin.js';
+      script.onload = () => {
+        if (typeof initFinPanel === 'function') {
+          initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName);
+        }
+        window.finModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName);
+    }
+  });
+}
 
 // 🖊️ Редактирование сделки
 async function showRopUpdateForm(crmId) {
