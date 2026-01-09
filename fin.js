@@ -10,6 +10,8 @@ function initFinPanel(supabaseClient, currentUserPhone, currentUserName, previou
   finCurrentUserName = currentUserName;
   finPreviousScreen = previousScreen;
 
+  console.log('Панель финансиста инициализирована для:', currentUserName);
+
   // Установите период по умолчанию (последний месяц)
   const today = new Date();
   const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -65,15 +67,16 @@ function goBackToPreviousScreen() {
     
     // Если на экране ROP есть функция для обновления данных - вызываем ее
     if (typeof loadRopData === 'function') {
+      console.log('Вызываем loadRopData для обновления данных');
       loadRopData();
     }
-  } else if (finPreviousScreen === 'adminScreen') {
-    document.getElementById('adminScreen').style.display = 'block';
-  } else if (finPreviousScreen === 'mainScreen') {
-    document.getElementById('mainScreen').style.display = 'block';
+  } else if (finPreviousScreen === 'crmScreen') {
+    document.getElementById('crmScreen').style.display = 'block';
+  } else if (finPreviousScreen === 'genScreen') {
+    document.getElementById('genScreen').style.display = 'block';
   } else {
-    // По умолчанию показываем главный экран
-    document.getElementById('mainScreen').style.display = 'block';
+    // По умолчанию показываем экран авторизации
+    document.getElementById('loginScreen').style.display = 'block';
   }
   
   // Обновляем историю браузера
@@ -378,3 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
     segmentFilter.addEventListener('change', loadFinData);
   }
 });
+
+// Экспорт функции для глобального использования
+if (typeof window !== 'undefined') {
+  window.initFinPanel = initFinPanel;
+}
