@@ -35,7 +35,7 @@ async function loadFinData() {
 
   try {
     // Загружаем сделки
-    const { data: deals, error: dealsError } = await finSupabaseClient
+    const {  deals, error: dealsError } = await finSupabaseClient
       .from('deals')
       .select('crm_id, manager_name, deal_type, contract_amount')
       .gte('created_at', dateFrom)
@@ -56,7 +56,7 @@ async function loadFinData() {
       expMap[e.crm_id] = e.fact_expenses || 0;
     });
 
-    // Заполняем фильтр менеджеров
+    // === ФИЛЬТР МЕНЕДЖЕРОВ ===
     const managerFilter = document.getElementById('finManagerFilter');
     const managerNames = [...new Set(deals.map(d => d.manager_name))];
     managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
@@ -67,13 +67,23 @@ async function loadFinData() {
       managerFilter.appendChild(opt);
     });
 
-    // Применяем фильтр по менеджеру
-    const selectedManager = managerFilter.value;
-    let filteredDeals = selectedManager 
-      ? deals.filter(d => d.manager_name === selectedManager)
-      : deals;
+    // === ФИЛЬТР СЕГМЕНТОВ ===
+    const segmentFilter = document.getElementById('finSegmentFilter');
 
-    // Заполняем таблицу
+    // === ПРИМЕНЯЕМ ФИЛЬТРЫ ===
+    let filteredDeals = deals;
+
+    const selectedManager = managerFilter.value;
+    if (selectedManager) {
+      filteredDeals = filteredDeals.filter(d => d.manager_name === selectedManager);
+    }
+
+    const selectedSegment = segmentFilter.value;
+    if (selectedSegment) {
+      filteredDeals = filteredDeals.filter(d => d.deal_type === selectedSegment);
+    }
+
+    // === ЗАПОЛНЯЕМ ТАБЛИЦУ ===
     const tbody = document.getElementById('finDealsBody');
     tbody.innerHTML = '';
 
@@ -82,7 +92,7 @@ async function loadFinData() {
       const dealType = deal.deal_type;
       const factExpenses = expMap[deal.crm_id] || 0;
 
-      // Расчёт теоретической маржи по типу сделки
+      // Расчёт теоретической маржи
       let theorMargin = 0;
       if (dealType === 'to' || dealType === 'pto' || dealType === 'rent') {
         theorMargin = contractAmount * 0.7;
@@ -93,20 +103,26 @@ async function loadFinData() {
       } else if (dealType === 'rep') {
         theorMargin = contractAmount * 0.4;
       }
-      // Если тип неизвестен — theorMargin остаётся 0
 
-      // Фактическая маржа = полная сумма договора − расходы
       const factMargin = contractAmount - factExpenses;
-
-      // Отклонение: на сколько % фактическая маржа ниже теоретической
       const deviation = theorMargin > 0 
         ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
         : 0;
+
+      // Человекочитаемый сегмент
+      const segmentLabel = 
+        dealType === 'to' ? 'ТО' :
+        dealType === 'pto' ? 'ПТО' :
+        dealType === 'eq' ? 'Оборудование' :
+        dealType === 'comp' ? 'Комплектующие' :
+        dealType === 'rep' ? 'Ремонты' :
+        dealType === 'rent' ? 'Аренда' : dealType;
 
       const row = document.createElement('tr');
       row.innerHTML = `
         <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
         <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
+        <td style="padding:8px; border:1px solid #ddd;">${segmentLabel}</td>
         <td style="padding:8px; border:1px solid #ddd;">${theorMargin.toLocaleString('ru-RU')} ₽</td>
         <td style="padding:8px; border:1px solid #ddd;">
           <input type="number" class="factExpensesInput" 
@@ -114,24 +130,25 @@ async function loadFinData() {
                  value="${factExpenses}" 
                  placeholder="0"
                  style="width:100px; padding:4px;">
-          <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
-                  style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
-            ✔️
-          </button>
         </td>
         <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
         <td style="padding:8px; border:1px solid #ddd; color:${deviation > 0 ? '#ff4d4f' : '#52c41a'};">
           ${deviation > 0 ? '+' : ''}${deviation}%
         </td>
-        <td style="padding:8px; border:1px solid #ddd;"></td>
+        <td style="padding:8px; border:1px solid #ddd;">
+          <button class="applyExpenseBtn" data-crm-id="${deal.crm_id}" 
+                  style="background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
+            Применить
+          </button>
+        </td>
       `;
       tbody.appendChild(row);
     });
 
     document.getElementById('finDealsTable').style.display = 'block';
 
-    // Обработчики сохранения
-    document.querySelectorAll('.saveExpenseBtn').forEach(btn => {
+    // === ОБРАБОТЧИК "ПРИМЕНИТЬ" ===
+    document.querySelectorAll('.applyExpenseBtn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const crmId = btn.getAttribute('data-crm-id');
         const input = document.querySelector(`.factExpensesInput[data-crm-id="${crmId}"]`);
@@ -152,7 +169,9 @@ async function loadFinData() {
         if (error) {
           alert('Ошибка сохранения: ' + error.message);
         } else {
-          loadFinData(); // перезагрузить данные
+          // Не перезагружаем всю таблицу — просто обновляем значение в карте
+          // Но для простоты можно и перезагрузить
+          loadFinData();
         }
       });
     });
