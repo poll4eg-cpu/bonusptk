@@ -106,7 +106,10 @@ document.addEventListener('DOMContentLoaded', () => {
  // 👤 Авторизация
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const phone = document.getElementById('loginPhone').value.trim();
-  if (!phone) { alert('Введите номер телефона'); return; }
+  if (!phone) { 
+    alert('Введите номер телефона'); 
+    return; 
+  }
 
   const passwordField = document.getElementById('passwordField');
   if (passwordField.style.display !== 'block') {
@@ -117,7 +120,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   }
 
   const password = document.getElementById('loginPassword').value.trim();
-  if (!password) { alert('Введите пароль'); return; }
+  if (!password) { 
+    alert('Введите пароль'); 
+    return; 
+  }
 
   const { data, error } = await supabaseClient
     .from('allowed_users')
@@ -141,12 +147,14 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   currentUserPhone = phone;
   currentUserName = data.name;
 
-  // 🔑 Если роль = 'rop' → загружаем панель РОПа
+  // 🔑 Определяем экран по роли
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+
   if (data.role === 'rop') {
-    document.getElementById('loginScreen').style.display = 'none';
+    // Панель РОПа
     document.getElementById('ropScreen').style.display = 'block';
     
-    // Динамически загружаем rop.js
     if (!window.ropModuleLoaded) {
       const script = document.createElement('script');
       script.src = 'rop.js';
@@ -157,24 +165,29 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         window.ropModuleLoaded = true;
       };
       document.head.appendChild(script);
+    } else {
+      initRopPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-    if (data.role === 'fin') {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('finScreen').style.display = 'block';
-  
-  if (!window.finModuleLoaded) {
-    const script = document.createElement('script');
-    script.src = 'fin.js';
-    script.onload = () => {
-      if (typeof initFinPanel === 'function') {
-        initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-      }
-      window.finModuleLoaded = true;
-    };
-    document.head.appendChild(script);
-  }
-}
-  } else {
+  } 
+  else if (data.role === 'fin') {
+    // Панель финансиста
+    document.getElementById('finScreen').style.display = 'block';
+    
+    if (!window.finModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'fin.js';
+      script.onload = () => {
+        if (typeof initFinPanel === 'function') {
+          initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.finModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+    }
+  } 
+  else {
     // Обычный менеджер
     showScreen('crm');
     updateUrl('crm');
@@ -626,6 +639,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
 
