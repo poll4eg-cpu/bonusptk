@@ -186,7 +186,25 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     } else {
       initFinPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-  } 
+  }
+  else if (data.role === 'gen') {
+    // Панель генерального директора
+    document.getElementById('genScreen').style.display = 'block';
+    
+    if (!window.genModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'gen.js';
+      script.onload = () => {
+        if (typeof initGenPanel === 'function') {
+          initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.genModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+    }
+  }
   else {
     // Обычный менеджер
     showScreen('crm');
@@ -639,6 +657,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
 
