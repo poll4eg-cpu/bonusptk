@@ -78,41 +78,37 @@ async function loadFinData() {
     tbody.innerHTML = '';
 
     filteredDeals.forEach(deal => {
-      const contractAmount = deal.contract_amount || 0; // ← полная сумма сделки
-const factExpenses = expMap[deal.crm_id] || 0;
-const factMargin = contractAmount - factExpenses; // ← фактическая маржа
+  const contractAmount = deal.contract_amount || 0;
+  const factExpenses = expMap[deal.crm_id] || 0;
+  const factMargin = contractAmount - factExpenses;
+  const deviation = contractAmount > 0 
+    ? ((factExpenses / contractAmount) * 100).toFixed(1) // % расходов от суммы
+    : 0;
 
-// Отклонение: (сумма − расходы) / сумма → на сколько % "чистая"
-const deviation = contractAmount > 0 
-  ? ((contractAmount - factMargin) / contractAmount * 100).toFixed(1)
-  : 0;
-
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
-        <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
-        <td style="padding:8px; border:1px solid #ddd;">${theorMargin.toLocaleString('ru-RU')} ₽</td>
-        <td style="padding:8px; border:1px solid #ddd;">
-          <input type="number" class="factExpensesInput" 
-                 data-crm-id="${deal.crm_id}" 
-                 value="${factExpenses}" 
-                 placeholder="0"
-                 style="width:100px; padding:4px;">
-          <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
-                  style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
-            ✔️
-          </button>
-        </td>
-        <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
-        <td style="padding:8px; border:1px solid #ddd; color:${deviation > 0 ? '#ff4d4f' : '#52c41a'};">
-          ${deviation > 0 ? '+' : ''}${deviation}%
-        </td>
-        <td style="padding:8px; border:1px solid #ddd;">
-          <!-- Можно добавить комментарий позже -->
-        </td>
-      `;
-      tbody.appendChild(row);
-    });
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
+    <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
+    <td style="padding:8px; border:1px solid #ddd;">${contractAmount.toLocaleString('ru-RU')} ₽</td>
+    <td style="padding:8px; border:1px solid #ddd;">
+      <input type="number" class="factExpensesInput" 
+             data-crm-id="${deal.crm_id}" 
+             value="${factExpenses}" 
+             placeholder="0"
+             style="width:100px; padding:4px;">
+      <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
+              style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
+        ✔️
+      </button>
+    </td>
+    <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
+    <td style="padding:8px; border:1px solid #ddd; color:${deviation > 30 ? '#ff4d4f' : '#52c41a'};">
+      ${deviation}%
+    </td>
+    <td style="padding:8px; border:1px solid #ddd;"></td>
+  `;
+  tbody.appendChild(row);
+});
 
     document.getElementById('finDealsTable').style.display = 'block';
 
