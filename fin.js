@@ -35,7 +35,7 @@ async function loadFinData() {
 
   try {
     // Загружаем сделки
-    const {  deals, error: dealsError } = await finSupabaseClient
+    const { data: deals, error: dealsError } = await finSupabaseClient
       .from('deals')
       .select('crm_id, manager_name, deal_type, contract_amount')
       .gte('created_at', dateFrom)
@@ -52,31 +52,31 @@ async function loadFinData() {
 
     // Карта расходов
     const expMap = {};
-    expenses.forEach(e => {
-      expMap[e.crm_id] = e.fact_expenses || 0;
-    });
+    if (expenses && Array.isArray(expenses)) {
+      expenses.forEach(e => {
+        expMap[e.crm_id] = e.fact_expenses || 0;
+      });
+    }
 
     // Заполняем фильтр менеджеров
-const managerFilter = document.getElementById('finManagerFilter');
-let managerNames = [];
-
-if (deals && Array.isArray(deals)) {
-  managerNames = [...new Set(deals.map(d => d.manager_name))];
-}
-
-managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
-managerNames.sort().forEach(name => {
-  const opt = document.createElement('option');
-  opt.value = name;
-  opt.textContent = name;
-  managerFilter.appendChild(opt);
-});
+    const managerFilter = document.getElementById('finManagerFilter');
+    let managerNames = [];
+    if (deals && Array.isArray(deals)) {
+      managerNames = [...new Set(deals.map(d => d.manager_name))];
+    }
+    managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
+    managerNames.sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      managerFilter.appendChild(opt);
+    });
 
     // === ФИЛЬТР СЕГМЕНТОВ ===
     const segmentFilter = document.getElementById('finSegmentFilter');
 
     // === ПРИМЕНЯЕМ ФИЛЬТРЫ ===
-    let filteredDeals = deals;
+    let filteredDeals = deals || [];
 
     const selectedManager = managerFilter.value;
     if (selectedManager) {
@@ -174,9 +174,7 @@ managerNames.sort().forEach(name => {
         if (error) {
           alert('Ошибка сохранения: ' + error.message);
         } else {
-          // Не перезагружаем всю таблицу — просто обновляем значение в карте
-          // Но для простоты можно и перезагрузить
-          loadFinData();
+          loadFinData(); // перезагрузить данные
         }
       });
     });
