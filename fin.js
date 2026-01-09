@@ -84,6 +84,28 @@ async function loadFinData() {
   const deviation = contractAmount > 0 
     ? ((factExpenses / contractAmount) * 100).toFixed(1) // % расходов от суммы
     : 0;
+      // Расчёт теоретической маржи по типу сделки
+let theorMargin = 0;
+const dealType = deal.deal_type;
+if (dealType === 'to' || dealType === 'pto' || dealType === 'rent') {
+  theorMargin = contractAmount * 0.7;
+} else if (dealType === 'eq') {
+  theorMargin = contractAmount * 0.2;
+} else if (dealType === 'comp') {
+  theorMargin = contractAmount * 0.3;
+} else if (dealType === 'rep') {
+  theorMargin = contractAmount * 0.4;
+}
+// Если тип неизвестен — theorMargin остаётся 0
+
+// Фактическая маржа = полная сумма договора − расходы
+const factMargin = contractAmount - factExpenses;
+
+// Отклонение: на сколько % фактическая маржа ниже теоретической
+// (положительное значение = хуже)
+const deviation = theorMargin > 0 
+  ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
+  : 0;
 
   const row = document.createElement('tr');
   row.innerHTML = `
