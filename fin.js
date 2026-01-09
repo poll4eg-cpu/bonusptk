@@ -56,16 +56,21 @@ async function loadFinData() {
       expMap[e.crm_id] = e.fact_expenses || 0;
     });
 
-    // === ФИЛЬТР МЕНЕДЖЕРОВ ===
-    const managerFilter = document.getElementById('finManagerFilter');
-    const managerNames = [...new Set(deals.map(d => d.manager_name))];
-    managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
-    managerNames.sort().forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      managerFilter.appendChild(opt);
-    });
+    // Заполняем фильтр менеджеров
+const managerFilter = document.getElementById('finManagerFilter');
+let managerNames = [];
+
+if (deals && Array.isArray(deals)) {
+  managerNames = [...new Set(deals.map(d => d.manager_name))];
+}
+
+managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
+managerNames.sort().forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  managerFilter.appendChild(opt);
+});
 
     // === ФИЛЬТР СЕГМЕНТОВ ===
     const segmentFilter = document.getElementById('finSegmentFilter');
