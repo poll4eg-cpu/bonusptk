@@ -158,6 +158,22 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       };
       document.head.appendChild(script);
     }
+    if (data.role === 'fin') {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('finScreen').style.display = 'block';
+  
+  if (!window.finModuleLoaded) {
+    const script = document.createElement('script');
+    script.src = 'fin.js';
+    script.onload = () => {
+      if (typeof initFinPanel === 'function') {
+        initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+      }
+      window.finModuleLoaded = true;
+    };
+    document.head.appendChild(script);
+  }
+}
   } else {
     // Обычный менеджер
     showScreen('crm');
@@ -610,5 +626,6 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
