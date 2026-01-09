@@ -2,11 +2,13 @@
 let finSupabaseClient = null;
 let finCurrentUserPhone = null;
 let finCurrentUserName = null;
+let finPreviousScreen = null; // Для отслеживания предыдущего экрана
 
-function initFinPanel(supabaseClient, currentUserPhone, currentUserName) {
+function initFinPanel(supabaseClient, currentUserPhone, currentUserName, previousScreen = 'ropScreen') {
   finSupabaseClient = supabaseClient;
   finCurrentUserPhone = currentUserPhone;
   finCurrentUserName = currentUserName;
+  finPreviousScreen = previousScreen;
 
   // Установите период по умолчанию (последний месяц)
   const today = new Date();
@@ -16,15 +18,68 @@ function initFinPanel(supabaseClient, currentUserPhone, currentUserName) {
 
   // Обработчики
   document.getElementById('loadFinData').addEventListener('click', loadFinData);
+  
+  // Обработчик кнопки "Назад"
   document.getElementById('backToRopFromFin').addEventListener('click', () => {
-    document.getElementById('finScreen').style.display = 'none';
-    document.getElementById('ropScreen').style.display = 'block';
+    goBackToPreviousScreen();
   });
 
   // Инициализация фильтров
   initFilters();
   
   loadFinData(); // загрузить при старте
+  
+  // Настройка обработчика нажатия кнопки "Назад" в браузере
+  setupBrowserBackButton();
+}
+
+// Функция для настройки обработчика кнопки "Назад" браузера
+function setupBrowserBackButton() {
+  // Сохраняем текущее состояние
+  if (window.history && window.history.pushState) {
+    // Добавляем новое состояние в историю
+    window.history.pushState({ screen: 'finScreen' }, 'Панель финансиста');
+    
+    // Обработчик события popstate (нажатие кнопки "Назад" в браузере)
+    window.addEventListener('popstate', function(event) {
+      if (document.getElementById('finScreen').style.display !== 'none') {
+        // Если мы на экране финансиста - возвращаемся на предыдущий экран
+        goBackToPreviousScreen();
+        
+        // Предотвращаем стандартное поведение браузера
+        if (event.state && event.state.screen === 'finScreen') {
+          window.history.back(); // Убираем добавленное состояние
+        }
+      }
+    });
+  }
+}
+
+// Функция возврата на предыдущий экран
+function goBackToPreviousScreen() {
+  document.getElementById('finScreen').style.display = 'none';
+  
+  // Показываем предыдущий экран в зависимости от того, откуда пришли
+  if (finPreviousScreen === 'ropScreen') {
+    document.getElementById('ropScreen').style.display = 'block';
+    
+    // Если на экране ROP есть функция для обновления данных - вызываем ее
+    if (typeof loadRopData === 'function') {
+      loadRopData();
+    }
+  } else if (finPreviousScreen === 'adminScreen') {
+    document.getElementById('adminScreen').style.display = 'block';
+  } else if (finPreviousScreen === 'mainScreen') {
+    document.getElementById('mainScreen').style.display = 'block';
+  } else {
+    // По умолчанию показываем главный экран
+    document.getElementById('mainScreen').style.display = 'block';
+  }
+  
+  // Обновляем историю браузера
+  if (window.history && window.history.pushState) {
+    window.history.pushState({ screen: finPreviousScreen }, 'Предыдущий экран');
+  }
 }
 
 function initFilters() {
