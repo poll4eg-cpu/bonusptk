@@ -78,12 +78,14 @@ async function loadFinData() {
     tbody.innerHTML = '';
 
     filteredDeals.forEach(deal => {
-      const theorMargin = deal.margin || 0;
-      const factExpenses = expMap[deal.crm_id] || 0;
-      const factMargin = theorMargin - factExpenses;
-      const deviation = theorMargin > 0 
-        ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
-        : 0;
+      const contractAmount = deal.contract_amount || 0; // ← полная сумма сделки
+const factExpenses = expMap[deal.crm_id] || 0;
+const factMargin = contractAmount - factExpenses; // ← фактическая маржа
+
+// Отклонение: (сумма − расходы) / сумма → на сколько % "чистая"
+const deviation = contractAmount > 0 
+  ? ((contractAmount - factMargin) / contractAmount * 100).toFixed(1)
+  : 0;
 
       const row = document.createElement('tr');
       row.innerHTML = `
