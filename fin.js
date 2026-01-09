@@ -37,7 +37,7 @@ async function loadFinData() {
     // Загружаем сделки
     const { data: deals, error: dealsError } = await finSupabaseClient
       .from('deals')
-      .select('crm_id, manager_name, deal_type, contract_amount, margin')
+      .select('crm_id, manager_name, deal_type, contract_amount')
       .gte('created_at', dateFrom)
       .lte('created_at', dateTo + 'T23:59:59');
 
@@ -78,59 +78,55 @@ async function loadFinData() {
     tbody.innerHTML = '';
 
     filteredDeals.forEach(deal => {
-  const contractAmount = deal.contract_amount || 0;
-  const factExpenses = expMap[deal.crm_id] || 0;
-  const factMargin = contractAmount - factExpenses;
-  const deviation = contractAmount > 0 
-    ? ((factExpenses / contractAmount) * 100).toFixed(1) // % расходов от суммы
-    : 0;
+      const contractAmount = deal.contract_amount || 0;
+      const dealType = deal.deal_type;
+      const factExpenses = expMap[deal.crm_id] || 0;
+
       // Расчёт теоретической маржи по типу сделки
-let theorMargin = 0;
-const dealType = deal.deal_type;
-if (dealType === 'to' || dealType === 'pto' || dealType === 'rent') {
-  theorMargin = contractAmount * 0.7;
-} else if (dealType === 'eq') {
-  theorMargin = contractAmount * 0.2;
-} else if (dealType === 'comp') {
-  theorMargin = contractAmount * 0.3;
-} else if (dealType === 'rep') {
-  theorMargin = contractAmount * 0.4;
-}
-// Если тип неизвестен — theorMargin остаётся 0
+      let theorMargin = 0;
+      if (dealType === 'to' || dealType === 'pto' || dealType === 'rent') {
+        theorMargin = contractAmount * 0.7;
+      } else if (dealType === 'eq') {
+        theorMargin = contractAmount * 0.2;
+      } else if (dealType === 'comp') {
+        theorMargin = contractAmount * 0.3;
+      } else if (dealType === 'rep') {
+        theorMargin = contractAmount * 0.4;
+      }
+      // Если тип неизвестен — theorMargin остаётся 0
 
-// Фактическая маржа = полная сумма договора − расходы
-const factMargin = contractAmount - factExpenses;
+      // Фактическая маржа = полная сумма договора − расходы
+      const factMargin = contractAmount - factExpenses;
 
-// Отклонение: на сколько % фактическая маржа ниже теоретической
-// (положительное значение = хуже)
-const deviation = theorMargin > 0 
-  ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
-  : 0;
+      // Отклонение: на сколько % фактическая маржа ниже теоретической
+      const deviation = theorMargin > 0 
+        ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
+        : 0;
 
-  const row = document.createElement('tr');
-  row.innerHTML = `
-  <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
-  <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
-  <td style="padding:8px; border:1px solid #ddd;">${theorMargin.toLocaleString('ru-RU')} ₽</td>
-  <td style="padding:8px; border:1px solid #ddd;">
-    <input type="number" class="factExpensesInput" 
-           data-crm-id="${deal.crm_id}" 
-           value="${factExpenses}" 
-           placeholder="0"
-           style="width:100px; padding:4px;">
-    <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
-            style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
-      ✔️
-    </button>
-  </td>
-  <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
-  <td style="padding:8px; border:1px solid #ddd; color:${deviation > 0 ? '#ff4d4f' : '#52c41a'};">
-    ${deviation > 0 ? '+' : ''}${deviation}%
-  </td>
-  <td style="padding:8px; border:1px solid #ddd;"></td>
-`;
-  tbody.appendChild(row);
-});
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="padding:8px; border:1px solid #ddd;">${deal.crm_id}</td>
+        <td style="padding:8px; border:1px solid #ddd;">${deal.manager_name}</td>
+        <td style="padding:8px; border:1px solid #ddd;">${theorMargin.toLocaleString('ru-RU')} ₽</td>
+        <td style="padding:8px; border:1px solid #ddd;">
+          <input type="number" class="factExpensesInput" 
+                 data-crm-id="${deal.crm_id}" 
+                 value="${factExpenses}" 
+                 placeholder="0"
+                 style="width:100px; padding:4px;">
+          <button class="saveExpenseBtn" data-crm-id="${deal.crm_id}" 
+                  style="margin-left:5px; background:#52c41a; color:white; border:none; padding:4px 8px; border-radius:4px;">
+            ✔️
+          </button>
+        </td>
+        <td style="padding:8px; border:1px solid #ddd;">${factMargin.toLocaleString('ru-RU')} ₽</td>
+        <td style="padding:8px; border:1px solid #ddd; color:${deviation > 0 ? '#ff4d4f' : '#52c41a'};">
+          ${deviation > 0 ? '+' : ''}${deviation}%
+        </td>
+        <td style="padding:8px; border:1px solid #ddd;"></td>
+      `;
+      tbody.appendChild(row);
+    });
 
     document.getElementById('finDealsTable').style.display = 'block';
 
