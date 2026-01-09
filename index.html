@@ -1,54 +1,228 @@
-<!-- 🔹 Экран финансиста -->
-<div id="finScreen" class="card" style="display:none;">
-  <h2><i class="fas fa-chart-line"></i> Финансовый контроль</h2>
-  
-  <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
-    <div>
-      <label>С:</label>
-      <input type="date" id="finDateFrom">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Калькулятор премий</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Экран 1: Авторизация -->
+    <div id="loginScreen" class="card">
+      <h1>Калькулятор премий</h1>
+      <label>Ваш рабочий номер телефона:</label>
+      <input type="text" id="loginPhone" placeholder="+79123456789">
+      
+      <!-- Поле пароля -->
+      <div id="passwordField" style="display:none; margin-top:12px;">
+        <label>Пароль:</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      
+      <button id="loginBtn">Войти</button>
+      <div id="loginError" class="error-message"></div>
     </div>
-    <div>
-      <label>По:</label>
-      <input type="date" id="finDateTo">
+
+    <!-- Экран 2: CRM (только для менеджеров) -->
+    <div id="crmScreen" class="card" style="display:none;">
+      <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
+      <label>Номер сделки в CRM (из Битрикс):</label>
+      <input type="text" id="inputCrmId" placeholder="Например: 12345">
+      <button id="checkCrmBtn" class="btn-success">Найти / Создать</button>
+      <div id="crmError" class="error-message"></div>
+
+      <button id="checkMonthBtn" class="btn-warning">Посмотреть премию за месяц</button>
+      <div id="monthResult" class="result"></div>
+
+      <!-- Обратная связь -->
+      <div class="feedback-section">
+        <button id="feedbackBtn">Написать разработчику</button>
+        <div id="feedbackForm" style="display:none;">
+          <textarea id="feedbackText" placeholder="Ваша идея, ошибка или пожелание..."></textarea>
+          <button id="sendFeedbackBtn" class="btn-success">Отправить</button>
+          <div id="feedbackResult"></div>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Менеджер:</label>
-      <select id="finManagerFilter">
-        <option value="">Все менеджеры</option>
-      </select>
+
+    <!-- Форма создания/редактирования -->
+    <div id="mainApp" style="display:none;">
+      <div id="formContainer"></div>
     </div>
-    <div>
-      <label>Сегмент:</label>
-      <select id="finSegmentFilter">
-        <option value="">Все сегменты</option>
-        <option value="to">ТО</option>
-        <option value="pto">ПТО</option>
-        <option value="eq">Оборудование</option>
-        <option value="comp">Комплектующие</option>
-        <option value="rep">Ремонты</option>
-        <option value="rent">Аренда</option>
-      </select>
+
+    <!-- 🔹 Панель РОПа -->
+    <div id="ropScreen" class="card" style="display:none;">
+      <h2><i class="fas fa-user-tie"></i> Панель РОПа</h2>
+      <button id="goToFin" class="btn-info" style="margin-top:10px;">📊 Финансовый контроль</button>
+      
+      <!-- 💡 Блок итогов -->
+      <div id="ropSummary" style="display:none; padding:16px; background:#f0f9ff; border-radius:8px; margin-bottom:20px;">
+        <h3>Итоги за период</h3>
+        <p><strong>Маржа отдела:</strong> <span id="totalMarginRop">0</span> ₽</p>
+        <p><strong>Премия РОПа:</strong> <span id="ropBonus">0</span> ₽</p>
+        <p><strong>Сделок:</strong> <span id="totalDealsRop">0</span></p>
+        <div id="ropPlanProgress" style="margin-top:12px; display:none;">
+          <strong>Выполнение плана:</strong>
+          <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px;">
+            <div id="ropPlanBar" style="height:100%; background:#1890ff; width:0%; border-radius:5px;"></div>
+          </div>
+          <small id="ropPlanPercent">0%</small>
+        </div>
+      </div>
+
+      <!-- Фильтры -->
+      <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+        <div>
+          <label>Менеджер:</label>
+          <select id="ropManagerFilter">
+            <option value="">Все</option>
+          </select>
+        </div>
+        <div>
+          <label>Сегмент:</label>
+          <select id="ropSegmentFilter">
+            <option value="">Все</option>
+            <option value="ТО">ТО</option>
+            <option value="ПТО">ПТО</option>
+            <option value="Оборудование">Оборудование</option>
+            <option value="Комплектующие">Комплектующие</option>
+            <option value="Ремонты">Ремонты</option>
+            <option value="Аренда">Аренда</option>
+          </select>
+        </div>
+        <button id="loadRopData">Загрузить</button>
+      </div>
+
+      <button id="ropCreateDealBtn" style="margin-bottom:20px;">Создать сделку</button>
+
+      <!-- Таблица -->
+      <div id="ropDealsTable" style="display:none;">
+        <h3>Сделки</h3>
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f1f1f1;">
+              <th style="padding:8px; border:1px solid #ddd;">CRM ID</th>
+              <th style="padding:8px; border:1px solid #ddd;">Менеджер</th>
+              <th style="padding:8px; border:1px solid #ddd;">Тип</th>
+              <th style="padding:8px; border:1px solid #ddd;">Договор</th>
+              <th style="padding:8px; border:1px solid #ddd;">Премия</th>
+              <th style="padding:8px; border:1px solid #ddd;">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="ropDealsBody"></tbody>
+        </table>
+      </div>
     </div>
-    <button id="loadFinData">Загрузить</button>
-    <button id="backToRopFromFin" style="margin-left:auto;">← Назад к РОПу</button>
+
+    <!-- 🔹 Экран финансиста -->
+    <div id="finScreen" class="card" style="display:none;">
+      <h2><i class="fas fa-chart-line"></i> Финансовый контроль</h2>
+      
+      <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+        <div>
+          <label>С:</label>
+          <input type="date" id="finDateFrom">
+        </div>
+        <div>
+          <label>По:</label>
+          <input type="date" id="finDateTo">
+        </div>
+        <div>
+          <label>Менеджер:</label>
+          <select id="finManagerFilter">
+            <option value="">Все менеджеры</option>
+          </select>
+        </div>
+        <div>
+          <label>Сегмент:</label>
+          <select id="finSegmentFilter">
+            <option value="">Все сегменты</option>
+            <option value="to">ТО</option>
+            <option value="pto">ПТО</option>
+            <option value="eq">Оборудование</option>
+            <option value="comp">Комплектующие</option>
+            <option value="rep">Ремонты</option>
+            <option value="rent">Аренда</option>
+          </select>
+        </div>
+        <button id="loadFinData">Загрузить</button>
+        <button id="backToRopFromFin" style="margin-left:auto;">← Назад к РОПу</button>
+      </div>
+
+      <div id="finDealsTable" style="display:none; margin-top:20px;">
+        <h3>Сделки с расходами</h3>
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f1f1f1;">
+              <th style="padding:8px; border:1px solid #ddd;">CRM ID</th>
+              <th style="padding:8px; border:1px solid #ddd;">Менеджер</th>
+              <th style="padding:8px; border:1px solid #ddd;">Сегмент</th>
+              <th style="padding:8px; border:1px solid #ddd;">Теор. маржа</th>
+              <th style="padding:8px; border:1px solid #ddd;">Расходы</th>
+              <th style="padding:8px; border:1px solid #ddd;">Факт. маржа</th>
+              <th style="padding:8px; border:1px solid #ddd;">Откл. %</th>
+              <th style="padding:8px; border:1px solid #ddd;">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="finDealsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 🔹 Панель генерального директора -->
+    <div id="genScreen" class="card" style="display:none;">
+      <h2><i class="fas fa-crown"></i> Панель генерального директора</h2>
+      
+      <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+        <div>
+          <label>С:</label>
+          <input type="date" id="genDateFrom">
+        </div>
+        <div>
+          <label>По:</label>
+          <input type="date" id="genDateTo">
+        </div>
+        <button id="loadGenData">Загрузить</button>
+      </div>
+
+      <!-- KPI -->
+      <div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;">
+        <div style="background:#f0f9ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+          <h3 style="margin:0 0 10px 0; color:#1890ff;">Выручка</h3>
+          <p id="totalRevenue" style="font-size:24px; margin:0; font-weight:bold;">0 ₽</p>
+        </div>
+        <div style="background:#f0fff4; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+          <h3 style="margin:0 0 10px 0; color:#52c41a;">Маржа</h3>
+          <p id="totalMargin" style="font-size:24px; margin:0; font-weight:bold;">0 ₽</p>
+        </div>
+        <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+          <h3 style="margin:0 0 10px 0; color:#faad14;">Маржинальность</h3>
+          <p id="marginPercent" style="font-size:24px; margin:0; font-weight:bold;">0%</p>
+        </div>
+        <div style="background:#fff0f6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+          <h3 style="margin:0 0 10px 0; color:#eb2f96;">Сделок</h3>
+          <p id="totalDeals" style="font-size:24px; margin:0; font-weight:bold;">0</p>
+        </div>
+      </div>
+
+      <!-- График -->
+      <div style="margin-top:30px;">
+        <h3>Динамика по неделям</h3>
+        <canvas id="revenueChart" height="120"></canvas>
+      </div>
+
+      <!-- Предупреждения -->
+      <div id="alerts" style="margin-top:30px;"></div>
+    </div>
+
+    <footer>Разработчик — Илья Галунин</footer>
   </div>
 
-  <div id="finDealsTable" style="display:none; margin-top:20px;">
-    <h3>Сделки с расходами</h3>
-    <table style="width:100%; border-collapse:collapse;">
-      <thead>
-        <tr style="background:#f1f1f1;">
-          <th style="padding:8px; border:1px solid #ddd;">CRM ID</th>
-          <th style="padding:8px; border:1px solid #ddd;">Менеджер</th>
-          <th style="padding:8px; border:1px solid #ddd;">Сегмент</th>
-          <th style="padding:8px; border:1px solid #ddd;">Теор. маржа</th>
-          <th style="padding:8px; border:1px solid #ddd;">Расходы</th>
-          <th style="padding:8px; border:1px solid #ddd;">Факт. маржа</th>
-          <th style="padding:8px; border:1px solid #ddd;">Откл. %</th>
-          <th style="padding:8px; border:1px solid #ddd;">Действия</th>
-        </tr>
-      </thead>
-      <tbody id="finDealsBody"></tbody>
-    </table>
-  </div>
-</div>
+  <!-- Иконки -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+</body>
+</html>
