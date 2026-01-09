@@ -6,12 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <!-- Загружаем модули в правильном порядке -->
-  <script src="fin.js"></script>
-  <script src="rop.js"></script>
-  <script src="app.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js" defer></script>
+  <!-- УБЕРИТЕ defer ОТСЮДА -->
 </head>
 <body>
   <div class="container">
@@ -224,5 +219,26 @@
 
     <footer>Разработчик — Илья Галунин</footer>
   </div>
+
+  <!-- Загружаем скрипты в конце body -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Ваши скрипты в правильном порядке -->
+  <script>
+    // Проверяем загрузку скриптов
+    console.log('DOM загружен, начинаем загрузку скриптов...');
+  </script>
+  
+  <!-- Загружаем ваши скрипты -->
+  <script src="fin.js"></script>
+  <script src="rop.js"></script>
+  <script src="app.js"></script>
+  
+  <script>
+    // Проверка загрузки функций
+    console.log('initRopPanel доступна:', typeof initRopPanel === 'function');
+    console.log('initFinPanel доступна:', typeof initFinPanel === 'function');
+  </script>
 </body>
 </html>
