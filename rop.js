@@ -4,21 +4,30 @@ let ropCurrentUserPhone = null;
 let ropCurrentUserName = null;
 
 function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
-  console.log('РОП-панель инициализирована');
+  console.log('РОП-панель инициализирована для:', currentUserName);
+  
   ropSupabaseClient = supabaseClient;
   ropCurrentUserPhone = currentUserPhone;
   ropCurrentUserName = currentUserName;
 
-  // Обработчики кнопок
-  document.getElementById('loadRopData').addEventListener('click', loadRopData);
-  document.getElementById('ropCreateDealBtn').addEventListener('click', showRopCreateForm);
-  
-  // Кнопка перехода к финансисту
+  // Обработчики кнопок - с проверкой существования элементов
+  const loadRopDataBtn = document.getElementById('loadRopData');
+  const ropCreateDealBtn = document.getElementById('ropCreateDealBtn');
   const goToFinBtn = document.getElementById('goToFin');
+  
+  if (loadRopDataBtn) {
+    loadRopDataBtn.addEventListener('click', loadRopData);
+  }
+  
+  if (ropCreateDealBtn) {
+    ropCreateDealBtn.addEventListener('click', showRopCreateForm);
+  }
+  
   if (goToFinBtn) {
-    goToFinBtn.addEventListener('click', () => {
-      goToFinPanel();
-    });
+    goToFinBtn.addEventListener('click', goToFinPanel);
+    console.log('Обработчик кнопки финансиста установлен');
+  } else {
+    console.error('Кнопка goToFin не найдена в DOM');
   }
 
   // Загружаем начальные данные
@@ -46,13 +55,15 @@ async function loadManagerList() {
     )];
 
     const managerSelect = document.getElementById('ropManagerFilter');
-    managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
-    managerNames.sort().forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name.trim();
-      opt.textContent = name.trim();
-      managerSelect.appendChild(opt);
-    });
+    if (managerSelect) {
+      managerSelect.innerHTML = '<option value="">Все менеджеры</option>';
+      managerNames.sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name.trim();
+        opt.textContent = name.trim();
+        managerSelect.appendChild(opt);
+      });
+    }
   } catch (error) {
     console.error('Ошибка загрузки списка менеджеров:', error);
   }
@@ -89,6 +100,8 @@ function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContra
 
 // 🔥 Основная загрузка данных
 async function loadRopData() {
+  console.log('Загрузка данных РОПа...');
+  
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -108,8 +121,11 @@ async function loadRopData() {
     }
 
     // Применяем фильтры
-    const managerFilter = document.getElementById('ropManagerFilter').value;
-    const segmentFilter = document.getElementById('ropSegmentFilter').value;
+    const managerFilter = document.getElementById('ropManagerFilter');
+    const segmentFilter = document.getElementById('ropSegmentFilter');
+    
+    const managerValue = managerFilter ? managerFilter.value : '';
+    const segmentValue = segmentFilter ? segmentFilter.value : '';
 
     const labelToType = {
       'ТО': 'to', 'ПТО': 'pto', 'Оборудование': 'eq',
@@ -117,10 +133,11 @@ async function loadRopData() {
     };
 
     let filteredData = data.filter(deal => deal.manager_name && deal.manager_name.trim() !== '');
-    if (managerFilter || segmentFilter) {
+    
+    if (managerValue || segmentValue) {
       filteredData = filteredData.filter(deal => {
-        const matchesManager = !managerFilter || deal.manager_name.trim() === managerFilter;
-        const matchesSegment = !segmentFilter || (labelToType[segmentFilter] && deal.deal_type === labelToType[segmentFilter]);
+        const matchesManager = !managerValue || deal.manager_name.trim() === managerValue;
+        const matchesSegment = !segmentValue || (labelToType[segmentValue] && deal.deal_type === labelToType[segmentValue]);
         return matchesManager && matchesSegment;
       });
     }
@@ -164,21 +181,7 @@ async function loadRopData() {
     const planPercent = Math.min(100, (totalMargin / departmentPlan) * 100);
 
     // 📊 Отображение итогов
-    const totalMarginEl = document.getElementById('totalMarginRop');
-    const ropBonusEl = document.getElementById('ropBonus');
-    const totalDealsEl = document.getElementById('totalDealsRop');
-    const planBar = document.getElementById('ropPlanBar');
-    const planPercentEl = document.getElementById('ropPlanPercent');
-    const summary = document.getElementById('ropSummary');
-    const planProgress = document.getElementById('ropPlanProgress');
-
-    if (totalMarginEl) totalMarginEl.textContent = totalMargin.toLocaleString('ru-RU');
-    if (ropBonusEl) ropBonusEl.textContent = ropBonus.toLocaleString('ru-RU');
-    if (totalDealsEl) totalDealsEl.textContent = filteredData.length;
-    if (planBar) planBar.style.width = planPercent + '%';
-    if (planPercentEl) planPercentEl.textContent = planPercent.toFixed(1) + '%';
-    if (summary) summary.style.display = 'block';
-    if (planProgress) planProgress.style.display = 'block';
+    updateRopSummary(totalMargin, ropBonus, filteredData.length, planPercent);
 
     // 📋 Заполнение таблицы с премиями
     const tbody = document.getElementById('ropDealsBody');
@@ -222,6 +225,9 @@ async function loadRopData() {
         tbody.appendChild(row);
       });
 
+      // Добавляем обработчики для кнопок редактирования
+      addEditDealHandlers();
+      
       const table = document.getElementById('ropDealsTable');
       if (table) table.style.display = 'block';
     }
@@ -231,8 +237,44 @@ async function loadRopData() {
   }
 }
 
+// Функция для обновления сводки РОПа
+function updateRopSummary(totalMargin, ropBonus, totalDeals, planPercent) {
+  const totalMarginEl = document.getElementById('totalMarginRop');
+  const ropBonusEl = document.getElementById('ropBonus');
+  const totalDealsEl = document.getElementById('totalDealsRop');
+  const planBar = document.getElementById('ropPlanBar');
+  const planPercentEl = document.getElementById('ropPlanPercent');
+  const summary = document.getElementById('ropSummary');
+  const planProgress = document.getElementById('ropPlanProgress');
+
+  if (totalMarginEl) totalMarginEl.textContent = totalMargin.toLocaleString('ru-RU');
+  if (ropBonusEl) ropBonusEl.textContent = ropBonus.toLocaleString('ru-RU');
+  if (totalDealsEl) totalDealsEl.textContent = totalDeals;
+  if (planBar) planBar.style.width = planPercent + '%';
+  if (planPercentEl) planPercentEl.textContent = planPercent.toFixed(1) + '%';
+  if (summary) summary.style.display = 'block';
+  if (planProgress) planProgress.style.display = 'block';
+}
+
+// Добавление обработчиков для кнопок редактирования
+function addEditDealHandlers() {
+  const editButtons = document.querySelectorAll('.editDealBtn');
+  editButtons.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const crmId = this.getAttribute('data-crm-id');
+      if (crmId) {
+        showRopUpdateForm(crmId);
+      }
+    });
+  });
+}
+
 // ➕ Создание сделки от РОПа
 async function showRopCreateForm() {
+  console.log('Показать форму создания сделки');
+  
   const crmId = prompt('Введите номер сделки из CRM:');
   if (!crmId) return;
 
@@ -250,6 +292,8 @@ async function showRopCreateForm() {
 
     if (error) {
       alert('Ошибка загрузки менеджеров: ' + error.message);
+      document.getElementById('createDealForm').style.display = 'none';
+      document.getElementById('ropScreen').style.display = 'block';
       return;
     }
 
@@ -421,11 +465,15 @@ async function showRopCreateForm() {
   } catch (error) {
     console.error('Ошибка при создании формы:', error);
     alert('Ошибка: ' + error.message);
+    document.getElementById('createDealForm').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
   }
 }
 
 // 🖊️ Редактирование сделки
 async function showRopUpdateForm(crmId) {
+  console.log('Редактирование сделки:', crmId);
+  
   try {
     const { data, error } = await ropSupabaseClient
       .from('deals')
@@ -549,27 +597,33 @@ async function showRopUpdateForm(crmId) {
   } catch (error) {
     console.error('Ошибка при редактировании:', error);
     alert('Ошибка: ' + error.message);
+    document.getElementById('editDealForm').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
   }
 }
 
 // Переход к панели финансиста
 function goToFinPanel() {
+  console.log('Переход к панели финансиста');
+  
   document.getElementById('ropScreen').style.display = 'none';
   document.getElementById('finScreen').style.display = 'block';
   
   if (typeof initFinPanel === 'function') {
+    console.log('Вызов initFinPanel...');
     initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName, 'ropScreen');
   } else {
-    console.error('Функция initFinPanel не найдена');
-    alert('Модуль финансиста не загружен');
+    console.error('Функция initFinPanel не найдена!');
+    alert('Модуль финансиста не загружен. Проверьте консоль браузера.');
+    
+    // Пробуем перезагрузить панель РОПа
+    document.getElementById('finScreen').style.display = 'none';
+    document.getElementById('ropScreen').style.display = 'block';
   }
 }
 
-// 🔙 Универсальный "назад"
-document.addEventListener('click', (e) => {
-  // Обработка редактирования из таблицы
-  if (e.target.classList.contains('editDealBtn')) {
-    const crmId = e.target.getAttribute('data-crm-id');
-    showRopUpdateForm(crmId);
-  }
-});
+// Экспорт функции для глобального использования
+if (typeof window !== 'undefined') {
+  window.initRopPanel = initRopPanel;
+  console.log('initRopPanel экспортирована в window');
+}
