@@ -1,7 +1,4 @@
 // gen.js — панель генерального директора
-let genSupabaseClient = null;
-let genCurrentUserPhone = null;
-let genCurrentUserName = null;
 let revenueChart = null;
 
 function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
@@ -30,18 +27,18 @@ async function loadGenData() {
 
   try {
     // Загружаем все сделки
-    const {  deals, error: dealsError } = await genSupabaseClient
-      .from('deals')
-      .select('crm_id, contract_amount, created_at')
-      .gte('created_at', dateFrom)
-      .lte('created_at', dateTo + 'T23:59:59');
+    const { data: deals, error: dealsError } = await genSupabaseClient
+  .from('deals')
+  .select('crm_id, contract_amount, created_at')
+  .gte('created_at', dateFrom)
+  .lte('created_at', dateTo + 'T23:59:59');
 
     if (dealsError) throw dealsError;
 
     // Загружаем все расходы
-    const {  expenses, error: expError } = await genSupabaseClient
-      .from('finance_expenses')
-      .select('crm_id, fact_expenses');
+    const { data: expenses, error: expError } = await genSupabaseClient
+  .from('finance_expenses')
+  .select('crm_id, fact_expenses');
 
     if (expError) throw expError;
 
