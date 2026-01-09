@@ -168,24 +168,6 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     } else {
       initRopPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-  } 
-  else if (data.role === 'fin') {
-    // Панель финансиста
-    document.getElementById('finScreen').style.display = 'block';
-    
-    if (!window.finModuleLoaded) {
-      const script = document.createElement('script');
-      script.src = 'fin.js';
-      script.onload = () => {
-        if (typeof initFinPanel === 'function') {
-          initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-        }
-        window.finModuleLoaded = true;
-      };
-      document.head.appendChild(script);
-    } else {
-      initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-    }
   }
   else if (data.role === 'fin') {
   console.log("Роль: fin — показываем экран");
@@ -657,6 +639,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
 
