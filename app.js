@@ -168,18 +168,36 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     } else {
       initRopPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-  }
+  } 
   else if (data.role === 'fin') {
-  console.log("Роль: fin — показываем экран");
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('finScreen').style.display = 'block';
-  
-  // Просто покажем сообщение
-  const body = document.getElementById('finDealsBody');
-  if (body) {
-    body.innerHTML = '<tr><td colspan="8">Тест: экран финансиста работает</td></tr>';
+    // Панель финансиста
+    document.getElementById('finScreen').style.display = 'block';
+    
+    if (!window.finModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'fin.js';
+      script.onload = () => {
+        if (typeof initFinPanel === 'function') {
+          initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.finModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+    }
   }
-}
+  else if (data.role === 'gen') {
+    // Панель генерального директора
+    document.getElementById('genScreen').style.display = 'block';
+    
+    if (!window.genModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'gen.js';
+      script.onload = () => {
+        if (typeof initGenPanel === 'function') {
+          initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
         window.genModuleLoaded = true;
       };
       document.head.appendChild(script);
@@ -639,6 +657,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
 
