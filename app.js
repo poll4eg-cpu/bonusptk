@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('app.js: DOM загружен, инициализация...');
+  
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -13,20 +15,50 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.pushState({ screen: screenName }, '', newUrl);
   }
 
+  // 🔧 Исправленная функция showScreen
   function showScreen(screenName) {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('crmScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'none';
-    if (document.getElementById('ropScreen')) {
-      document.getElementById('ropScreen').style.display = 'none';
-    }
-
+    console.log('showScreen вызывается для:', screenName);
+    
+    // Скрываем все экраны
+    const screens = ['loginScreen', 'crmScreen', 'mainApp', 'ropScreen', 'finScreen', 'genScreen'];
+    screens.forEach(screenId => {
+      const element = document.getElementById(screenId);
+      if (element) {
+        element.style.display = 'none';
+      }
+    });
+    
+    // Показываем нужный экран
     if (screenName === 'login') {
-      document.getElementById('loginScreen').style.display = 'block';
+      const loginScreen = document.getElementById('loginScreen');
+      if (loginScreen) {
+        loginScreen.style.display = 'block';
+      }
     } else if (screenName === 'crm') {
-      document.getElementById('crmScreen').style.display = 'block';
+      const crmScreen = document.getElementById('crmScreen');
+      if (crmScreen) {
+        crmScreen.style.display = 'block';
+      }
     } else if (screenName === 'form') {
-      document.getElementById('mainApp').style.display = 'block';
+      const mainApp = document.getElementById('mainApp');
+      if (mainApp) {
+        mainApp.style.display = 'block';
+      }
+    } else if (screenName === 'rop') {
+      const ropScreen = document.getElementById('ropScreen');
+      if (ropScreen) {
+        ropScreen.style.display = 'block';
+      }
+    } else if (screenName === 'fin') {
+      const finScreen = document.getElementById('finScreen');
+      if (finScreen) {
+        finScreen.style.display = 'block';
+      }
+    } else if (screenName === 'gen') {
+      const genScreen = document.getElementById('genScreen');
+      if (genScreen) {
+        genScreen.style.display = 'block';
+      }
     }
   }
 
@@ -103,114 +135,126 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
- // 👤 Авторизация
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('loginPhone').value.trim();
-  if (!phone) { 
-    alert('Введите номер телефона'); 
-    return; 
-  }
-
-  const passwordField = document.getElementById('passwordField');
-  if (passwordField.style.display !== 'block') {
-    passwordField.style.display = 'block';
-    document.getElementById('loginPassword').focus();
-    document.getElementById('loginBtn').textContent = 'Войти';
-    return;
-  }
-
-  const password = document.getElementById('loginPassword').value.trim();
-  if (!password) { 
-    alert('Введите пароль'); 
-    return; 
-  }
-
-  const { data, error } = await supabaseClient
-    .from('allowed_users')
-    .select('phone, name, role, password')
-    .eq('phone', phone)
-    .single();
-
-  if (error || !data) {
-    document.getElementById('loginError').textContent = 'Номер не найден.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
-
-  if (password !== data.password) {
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginError').textContent = 'Неверный пароль.';
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
-
-  currentUserPhone = phone;
-  currentUserName = data.name;
-
-  // 🔑 Определяем экран по роли
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('loginError').style.display = 'none';
-
-  if (data.role === 'rop') {
-    // Панель РОПа
-    document.getElementById('ropScreen').style.display = 'block';
+  // 👤 Авторизация
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    console.log('Кнопка входа нажата');
     
-    if (!window.ropModuleLoaded) {
-      const script = document.createElement('script');
-      script.src = 'rop.js';
-      script.onload = () => {
-        if (typeof initRopPanel === 'function') {
-          initRopPanel(supabaseClient, currentUserPhone, currentUserName);
-        }
-        window.ropModuleLoaded = true;
-      };
-      document.head.appendChild(script);
-    } else {
-      initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+    const phone = document.getElementById('loginPhone').value.trim();
+    if (!phone) { 
+      alert('Введите номер телефона'); 
+      return; 
     }
-  } 
-  else if (data.role === 'fin') {
-    // Панель финансиста
-    document.getElementById('finScreen').style.display = 'block';
-    
-    if (!window.finModuleLoaded) {
-      const script = document.createElement('script');
-      script.src = 'fin.js';
-      script.onload = () => {
-        if (typeof initFinPanel === 'function') {
-          initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-        }
-        window.finModuleLoaded = true;
-      };
-      document.head.appendChild(script);
-    } else {
-      initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+
+    const passwordField = document.getElementById('passwordField');
+    if (passwordField.style.display !== 'block') {
+      passwordField.style.display = 'block';
+      document.getElementById('loginPassword').focus();
+      document.getElementById('loginBtn').textContent = 'Войти';
+      return;
     }
-  }
-  else if (data.role === 'gen') {
-    // Панель генерального директора
-    document.getElementById('genScreen').style.display = 'block';
+
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!password) { 
+      alert('Введите пароль'); 
+      return; 
+    }
+
+    const { data, error } = await supabaseClient
+      .from('allowed_users')
+      .select('phone, name, role, password')
+      .eq('phone', phone)
+      .single();
+
+    if (error || !data) {
+      document.getElementById('loginError').textContent = 'Номер не найден.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+
+    if (password !== data.password) {
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginError').textContent = 'Неверный пароль.';
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+
+    currentUserPhone = phone;
+    currentUserName = data.name;
+    currentUserRole = data.role;
+
+    // 🔑 Определяем экран по роли
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('loginError').style.display = 'none';
     
-    if (!window.genModuleLoaded) {
-      const script = document.createElement('script');
-      script.src = 'gen.js';
-      script.onload = () => {
-        if (typeof initGenPanel === 'function') {
+    console.log('Пользователь авторизован:', {
+      name: data.name,
+      role: data.role,
+      phone: phone
+    });
+
+    if (data.role === 'rop') {
+      console.log('Показываем экран РОПа');
+      showScreen('rop');
+      updateUrl('rop');
+      
+      // Проверяем, загружен ли модуль РОПа
+      if (typeof initRopPanel !== 'function') {
+        console.error('Модуль РОПа не загружен! Проверьте rop.js');
+        alert('Ошибка: модуль РОПа не загружен. Обновите страницу.');
+        return;
+      }
+      
+      try {
+        initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+        console.log('initRopPanel успешно вызвана');
+      } catch (error) {
+        console.error('Ошибка при вызове initRopPanel:', error);
+      }
+    } 
+    else if (data.role === 'fin') {
+      console.log('Показываем экран финансиста');
+      showScreen('fin');
+      updateUrl('fin');
+      
+      // Проверяем, загружен ли модуль финансиста
+      if (typeof initFinPanel !== 'function') {
+        console.error('Модуль финансиста не загружен! Проверьте fin.js');
+        alert('Ошибка: модуль финансиста не загружен. Обновите страницу.');
+        return;
+      }
+      
+      try {
+        initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+        console.log('initFinPanel успешно вызвана');
+      } catch (error) {
+        console.error('Ошибка при вызове initFinPanel:', error);
+      }
+    }
+    else if (data.role === 'gen') {
+      console.log('Показываем экран генерального директора');
+      showScreen('gen');
+      updateUrl('gen');
+      
+      // Проверяем, загружен ли модуль директора
+      if (typeof initGenPanel !== 'function') {
+        console.log('Модуль директора не найден, используем базовый функционал');
+        // Здесь можно добавить базовый функционал для директора
+      } else {
+        try {
           initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+          console.log('initGenPanel успешно вызвана');
+        } catch (error) {
+          console.error('Ошибка при вызове initGenPanel:', error);
         }
-        window.genModuleLoaded = true;
-      };
-      document.head.appendChild(script);
-    } else {
-      initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+      }
     }
-  }
-  else {
-    // Обычный менеджер
-    showScreen('crm');
-    updateUrl('crm');
-  }
-});
+    else {
+      // Обычный менеджер
+      console.log('Показываем экран CRM для менеджера');
+      showScreen('crm');
+      updateUrl('crm');
+    }
+  });
 
   // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
@@ -642,8 +686,21 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   document.addEventListener('click', (e) => {
     if (e.target.id === 'backBtn') {
       document.getElementById('monthResult').style.display = 'none';
-      showScreen('crm');
-      updateUrl('crm');
+      
+      // В зависимости от роли пользователя возвращаемся на нужный экран
+      if (currentUserRole === 'rop') {
+        showScreen('rop');
+        updateUrl('rop');
+      } else if (currentUserRole === 'fin') {
+        showScreen('fin');
+        updateUrl('fin');
+      } else if (currentUserRole === 'gen') {
+        showScreen('gen');
+        updateUrl('gen');
+      } else {
+        showScreen('crm');
+        updateUrl('crm');
+      }
     }
   });
 
@@ -656,12 +713,6 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     const screen = event.state?.screen || 'login';
     showScreen(screen);
   });
+  
+  console.log('app.js: Инициализация завершена');
 });
-
-
-
-
-
-
-
-
