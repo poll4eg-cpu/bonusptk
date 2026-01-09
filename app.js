@@ -187,17 +187,17 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       initFinPanel(supabaseClient, currentUserPhone, currentUserName);
     }
   }
-  else if (data.role === 'gen') {
-    // Панель генерального директора
-    document.getElementById('genScreen').style.display = 'block';
-    
-    if (!window.genModuleLoaded) {
-      const script = document.createElement('script');
-      script.src = 'gen.js';
-      script.onload = () => {
-        if (typeof initGenPanel === 'function') {
-          initGenPanel(supabaseClient, currentUserPhone, currentUserName);
-        }
+  else if (data.role === 'fin') {
+  console.log("Роль: fin — показываем экран");
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('finScreen').style.display = 'block';
+  
+  // Просто покажем сообщение
+  const body = document.getElementById('finDealsBody');
+  if (body) {
+    body.innerHTML = '<tr><td colspan="8">Тест: экран финансиста работает</td></tr>';
+  }
+}
         window.genModuleLoaded = true;
       };
       document.head.appendChild(script);
@@ -657,6 +657,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     showScreen(screen);
   });
 });
+
 
 
 
