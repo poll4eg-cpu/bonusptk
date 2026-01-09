@@ -21,11 +21,36 @@ function initFinPanel(supabaseClient, currentUserPhone, currentUserName) {
     document.getElementById('ropScreen').style.display = 'block';
   });
 
-  // Обработчики для фильтров
-  document.getElementById('finManagerFilter').addEventListener('change', loadFinData);
-  document.getElementById('finSegmentFilter').addEventListener('change', loadFinData);
-
+  // Инициализация фильтров
+  initFilters();
+  
   loadFinData(); // загрузить при старте
+}
+
+function initFilters() {
+  // Сохраняем выбранные значения перед обновлением
+  const managerFilter = document.getElementById('finManagerFilter');
+  const segmentFilter = document.getElementById('finSegmentFilter');
+  
+  const savedManager = managerFilter.value;
+  const savedSegment = segmentFilter.value;
+  
+  // Заполняем фильтры начальными значениями
+  managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
+  segmentFilter.innerHTML = '<option value="">Все сегменты</option>';
+  
+  // Восстанавливаем значения
+  if (savedManager) {
+    setTimeout(() => {
+      managerFilter.value = savedManager;
+    }, 0);
+  }
+  
+  if (savedSegment) {
+    setTimeout(() => {
+      segmentFilter.value = savedSegment;
+    }, 0);
+  }
 }
 
 async function loadFinData() {
@@ -88,46 +113,60 @@ async function loadFinData() {
       'rent': 'Аренда'
     };
 
-    // Заполняем фильтр менеджеров
+    // Получаем текущие значения фильтров
     const managerFilter = document.getElementById('finManagerFilter');
-    let managerNames = [];
+    const segmentFilter = document.getElementById('finSegmentFilter');
+    
+    const currentManager = managerFilter.value;
+    const currentSegment = segmentFilter.value;
+    
+    // Собираем уникальных менеджеров из всех сделок за период
+    let allManagerNames = [];
     if (deals.length > 0) {
-      managerNames = [...new Set(deals.map(d => d.manager_name).filter(Boolean))];
+      allManagerNames = [...new Set(deals.map(d => d.manager_name).filter(Boolean))];
     }
+    
+    // Собираем уникальные сегменты из всех сделок за период
+    let allSegmentTypes = [];
+    if (deals.length > 0) {
+      allSegmentTypes = [...new Set(deals.map(d => d.deal_type).filter(Boolean))];
+    }
+
+    // Обновляем фильтр менеджеров, сохраняя текущее значение
     managerFilter.innerHTML = '<option value="">Все менеджеры</option>';
-    managerNames.sort().forEach(name => {
+    allManagerNames.sort().forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
+      if (name === currentManager) {
+        opt.selected = true;
+      }
       managerFilter.appendChild(opt);
     });
 
-    // Заполняем фильтр сегментов
-    const segmentFilter = document.getElementById('finSegmentFilter');
-    let segmentTypes = [];
-    if (deals.length > 0) {
-      segmentTypes = [...new Set(deals.map(d => d.deal_type).filter(Boolean))];
-    }
-    
+    // Обновляем фильтр сегментов, сохраняя текущее значение
     segmentFilter.innerHTML = '<option value="">Все сегменты</option>';
-    segmentTypes.sort().forEach(type => {
+    allSegmentTypes.sort().forEach(type => {
       const opt = document.createElement('option');
       opt.value = type;
       opt.textContent = segmentLabels[type] || type;
+      if (type === currentSegment) {
+        opt.selected = true;
+      }
       segmentFilter.appendChild(opt);
     });
 
-    // Применяем фильтры
+    // Применяем фильтры к данным
     let filteredDeals = deals.slice();
     
-    const selectedManager = managerFilter.value;
-    if (selectedManager) {
-      filteredDeals = filteredDeals.filter(d => d.manager_name === selectedManager);
+    // Фильтр по менеджеру
+    if (currentManager) {
+      filteredDeals = filteredDeals.filter(d => d.manager_name === currentManager);
     }
     
-    const selectedSegment = segmentFilter.value;
-    if (selectedSegment) {
-      filteredDeals = filteredDeals.filter(d => d.deal_type === selectedSegment);
+    // Фильтр по сегменту
+    if (currentSegment) {
+      filteredDeals = filteredDeals.filter(d => d.deal_type === currentSegment);
     }
 
     // Заполняем таблицу
@@ -143,6 +182,12 @@ async function loadFinData() {
       `;
       tbody.appendChild(row);
     } else {
+      // Считаем итоги
+      let totalContract = 0;
+      let totalTheorMargin = 0;
+      let totalFactExpenses = 0;
+      let totalFactMargin = 0;
+
       filteredDeals.forEach(deal => {
         const contractAmount = deal.contract_amount || 0;
         const dealType = deal.deal_type || '';
@@ -164,6 +209,12 @@ async function loadFinData() {
         const deviation = theorMargin > 0 
           ? ((theorMargin - factMargin) / theorMargin * 100).toFixed(1)
           : 0;
+
+        // Обновляем итоги
+        totalContract += contractAmount;
+        totalTheorMargin += theorMargin;
+        totalFactExpenses += factExpenses;
+        totalFactMargin += factMargin;
 
         // Человекочитаемый сегмент
         const segmentLabel = segmentLabels[dealType] || 'Неизвестный';
@@ -194,6 +245,27 @@ async function loadFinData() {
         `;
         tbody.appendChild(row);
       });
+
+      // Добавляем строку с итогами
+      const totalDeviation = totalTheorMargin > 0 
+        ? ((totalTheorMargin - totalFactMargin) / totalTheorMargin * 100).toFixed(1)
+        : 0;
+      
+      const totalRow = document.createElement('tr');
+      totalRow.style.fontWeight = 'bold';
+      totalRow.style.backgroundColor = '#f9f9f9';
+      totalRow.innerHTML = `
+        <td colspan="2" style="padding:8px; border:1px solid #ddd;">ИТОГО:</td>
+        <td style="padding:8px; border:1px solid #ddd;">${filteredDeals.length} сделок</td>
+        <td style="padding:8px; border:1px solid #ddd;">${totalTheorMargin.toLocaleString('ru-RU')} ₽</td>
+        <td style="padding:8px; border:1px solid #ddd;">${totalFactExpenses.toLocaleString('ru-RU')} ₽</td>
+        <td style="padding:8px; border:1px solid #ddd;">${totalFactMargin.toLocaleString('ru-RU')} ₽</td>
+        <td style="padding:8px; border:1px solid #ddd; color:${totalDeviation > 0 ? '#ff4d4f' : '#52c41a'};">
+          ${totalDeviation > 0 ? '+' : ''}${totalDeviation}%
+        </td>
+        <td style="padding:8px; border:1px solid #ddd;"></td>
+      `;
+      tbody.appendChild(totalRow);
     }
 
     document.getElementById('finDealsTable').style.display = 'block';
@@ -237,3 +309,17 @@ async function loadFinData() {
     alert('Произошла непредвиденная ошибка. Проверьте консоль.');
   }
 }
+
+// Добавляем обработчики для фильтров после загрузки DOM
+document.addEventListener('DOMContentLoaded', function() {
+  const managerFilter = document.getElementById('finManagerFilter');
+  const segmentFilter = document.getElementById('finSegmentFilter');
+  
+  if (managerFilter) {
+    managerFilter.addEventListener('change', loadFinData);
+  }
+  
+  if (segmentFilter) {
+    segmentFilter.addEventListener('change', loadFinData);
+  }
+});
