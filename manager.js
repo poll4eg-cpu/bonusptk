@@ -2,6 +2,7 @@
 let managerSupabaseClient = null;
 let managerCurrentUserPhone = null;
 let managerCurrentUserName = null;
+let currentCrmId = null;
 
 function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
   console.log('Менеджер инициализирован:', currentUserName);
@@ -23,6 +24,8 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
   async function checkCrmId() {
     const crmId = document.getElementById('inputCrmId')?.value.trim();
     if (!crmId) return showError('crmError', 'Введите номер сделки');
+    
+    currentCrmId = crmId; // Сохраняем для создания сделки
 
     try {
       const { data, error } = await managerSupabaseClient
@@ -70,7 +73,11 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
     try {
       const { error } = await managerSupabaseClient
         .from('feedback')
-        .insert([{ phone: managerCurrentUserPhone, message: msg, created_at: new Date().toISOString() }]);
+        .insert([{ 
+          phone: managerCurrentUserPhone, 
+          message: msg, 
+          created_at: new Date().toISOString() 
+        }]);
       if (error) throw error;
       alert('✅ Сообщение отправлено!');
       document.getElementById('feedbackText').value = '';
@@ -151,14 +158,14 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
     const upSigned = document.getElementById('up_signed').checked;
 
     if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-      return alert('Заполните все поля');
+      return alert('Заполните все обязательные поля');
     }
 
     const totalPaid = paymentAmount;
-    const isFullyPaid = totalPaid >= contractAmount;
+    const isFullyPaid = paid && totalPaid >= contractAmount;
     let bonusPaid = 0;
 
-    if (isFullyPaid) {
+    if (isFullyPaid && upSigned) {
       let revenueForBonus = contractAmount;
       if (dealType === 'to') {
         const arpuValue = arpuInput ? parseFloat(arpuInput) : contractAmount / 12;
@@ -177,7 +184,7 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
       const { error } = await managerSupabaseClient
         .from('deals')
         .insert([{
-          crm_id: crmId,
+          crm_id: currentCrmId,
           manager_name: managerName,
           deal_type: dealType,
           contract_amount: contractAmount,
@@ -187,16 +194,24 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
           is_first: isFirst,
           arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
           margin: margin,
-          bonus_paid: bonusPaid
+          bonus_paid: bonusPaid,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }]);
 
       if (error) throw error;
 
       document.getElementById('createFormResult').innerHTML = `
-        Сделка создана!<br>
-        Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}
+        <div style="color:green; background:#f0fff4; padding:12px; border-radius:6px;">
+          ✅ Сделка создана успешно!<br>
+          ${bonusPaid > 0 ? `Премия: <strong>${bonusPaid.toLocaleString('ru-RU')} ₽</strong>` : 'Премия будет начислена после полной оплаты и подписания УПД'}
+        </div>
       `;
       document.getElementById('createFormResult').style.display = 'block';
+      
+      // Очистка поля CRM ID
+      document.getElementById('inputCrmId').value = '';
+      
     } catch (err) {
       alert('Ошибка: ' + (err.message || err));
     }
@@ -225,15 +240,19 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
       <p><strong>УПД:</strong> ${up_signed ? '✅ Подписан' : '❌ Не подписан'}</p>
       <p><strong>Статус оплаты:</strong> ${paid ? '✅ 100%' : '⏳ Частичная'}</p>
 
-      <label>Сумма нового платежа (₽):</label>
-      <input type="number" id="additional_payment" placeholder="Например: 100000" ${paid ? 'disabled' : ''}>
+      ${!paid ? `
+        <label>Сумма нового платежа (₽):</label>
+        <input type="number" id="additional_payment" placeholder="Например: 100000" min="1">
+      ` : ''}
 
-      <div style="margin-top:15px;">
-        <input type="checkbox" id="update_up_signed" ${up_signed ? 'checked disabled' : ''}>
-        <label for="update_up_signed">Отметить УПД как подписанный</label>
-      </div>
+      ${!up_signed ? `
+        <div style="margin-top:15px;">
+          <input type="checkbox" id="update_up_signed">
+          <label for="update_up_signed">Отметить УПД как подписанный</label>
+        </div>
+      ` : '<p>✅ УПД уже подписан</p>'}
 
-      <button id="updateDealBtn" class="btn-success">Обновить УПД</button>
+      <button id="updateDealBtn" class="btn-success">Обновить сделку</button>
       <div id="updateFormResult" class="result"></div>
     `;
 
@@ -246,11 +265,16 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
 
   async function updateDeal(deal) {
     const additionalPayment = parseFloat(document.getElementById('additional_payment')?.value || 0);
-    const newUpSigned = document.getElementById('update_up_signed').checked;
+    const newUpSigned = document.getElementById('update_up_signed')?.checked || deal.up_signed;
     const { crm_id, contract_amount, total_paid, paid, deal_type, is_first, arpu_input, annual_contract } = deal;
 
-    if (paid && deal.up_signed === newUpSigned) return alert('Нечего обновлять');
-    if (!paid && (isNaN(additionalPayment) || additionalPayment <= 0)) return alert('Введите корректную сумму');
+    if (paid && deal.up_signed === newUpSigned && additionalPayment <= 0) {
+      return alert('Нечего обновлять');
+    }
+    
+    if (!paid && (isNaN(additionalPayment) || additionalPayment <= 0)) {
+      return alert('Введите корректную сумму платежа');
+    }
 
     let newTotalPaid = total_paid;
     let newPaid = paid;
@@ -284,10 +308,13 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
       if (error) throw error;
 
       document.getElementById('updateFormResult').innerHTML = `
-        Сделка обновлена!<br>
-        ${newPaid && bonusPaid > 0 ? `Начислена премия: ${bonusPaid.toLocaleString('ru-RU')} ₽` : 'Премия не начислена'}
+        <div style="color:green; background:#f0fff4; padding:12px; border-radius:6px;">
+          ✅ Сделка обновлена!<br>
+          ${newPaid && bonusPaid > 0 ? `Начислена премия: <strong>${bonusPaid.toLocaleString('ru-RU')} ₽</strong>` : 'Премия будет начислена после полной оплаты и подписания УПД'}
+        </div>
       `;
       document.getElementById('updateFormResult').style.display = 'block';
+      
     } catch (err) {
       alert('Ошибка: ' + (err.message || err));
     }
@@ -323,78 +350,3 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
         </tr>
       `;
     }).join('');
-
-    const basePlan = 800000;
-    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-    const plan = basePlan * coefficients[now.getMonth()];
-    const planPercent = (totalMargin / plan) * 100;
-    let finalPayout = planPercent >= 100 ? totalBonus : (planPercent >= 50 ? Math.round(totalBonus * 0.5) : 0);
-
-    resultDiv.innerHTML = `
-      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-        <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-        <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-        <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-        <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
-      </div>
-      <h4>Сделки (${deals.length} шт):</h4>
-      <table style="width:100%; font-size:14px;">
-        <thead><tr><th>CRM ID</th><th>Тип</th><th>Договор</th><th>Оплата</th><th>Премия</th></tr></thead>
-        <tbody>${dealRows}</tbody>
-      </table>
-    `;
-    resultDiv.style.display = 'block';
-  }
-
-  // Вспомогательные функции
-  function dealTypeLabel(type) {
-    return {
-      'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
-      'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
-    }[type] || type;
-  }
-
-  function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
-    if (!paid || !upSigned) return 0;
-    if (dealType === 'to') {
-      if (annualContract && revenue >= 35000) return Math.round(revenue * 12 * 0.03);
-      if (isFirst) {
-        if (revenue >= 70000) return 6000;
-        if (revenue >= 35000) return 3000;
-        return 500;
-      } else {
-        if (revenue >= 70000) return 2000;
-        if (revenue >= 35000) return 1000;
-        return 200;
-      }
-    }
-    if (dealType === 'pto') {
-      if (revenue >= 360000) return 6000;
-      if (revenue >= 90000) return 3000;
-      return 1000;
-    }
-    if (dealType === 'comp' || dealType === 'rep') {
-      if (revenue >= 300000) return Math.round(revenue * 0.01);
-      return Math.round(revenue * 0.03);
-    }
-    if (dealType === 'eq') return Math.round(revenue * 0.01);
-    if (dealType === 'rent') return 1500;
-    return 0;
-  }
-
-  function showError(id, text) {
-    const el = document.getElementById(id);
-    if (el) {
-      el.textContent = text;
-      el.style.display = 'block';
-    }
-  }
-
-  console.log('Модуль менеджера готов');
-}
-
-// Экспорт
-if (typeof window !== 'undefined') {
-  window.initManagerPanel = initManagerPanel;
-}
