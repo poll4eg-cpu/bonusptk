@@ -5,6 +5,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
+  // 🔑 Конфигурация CRM (Битрикс24)
+  const CRM_CONFIG = {
+    domain: 'deguashemaxibinktze.bitrix24.ru', // Замените на ваш домен
+    restUrl: '/rest/1', // REST API endpoint
+    userId: '1', // ID пользователя для создания сделок
+    defaultStage: 'NEW', // Стадия новой сделки
+    defaultSource: 'SELF', // Источник
+    defaultCategory: '1' // Воронка сделок
+  };
+
   let currentUserPhone = null;
   let currentUserName = null;
   let currentUserRole = null;
@@ -60,6 +70,71 @@ document.addEventListener('DOMContentLoaded', () => {
         genScreen.style.display = 'block';
       }
     }
+  }
+
+  // 🔄 Функция создания сделки в CRM (Битрикс24)
+  async function createDealInCRM(dealData) {
+    console.log('Создание сделки в CRM:', dealData);
+    
+    try {
+      // Формируем данные для CRM
+      const crmDealData = {
+        fields: {
+          TITLE: `Сделка #${dealData.crm_id} - ${dealData.manager_name}`,
+          TYPE_ID: getCRMDealType(dealData.deal_type),
+          STAGE_ID: CRM_CONFIG.defaultStage,
+          CATEGORY_ID: CRM_CONFIG.defaultCategory,
+          CURRENCY_ID: "RUB",
+          OPPORTUNITY: dealData.contract_amount,
+          ASSIGNED_BY_ID: CRM_CONFIG.userId,
+          SOURCE_ID: CRM_CONFIG.defaultSource,
+          UTM_SOURCE: "Премиальная система",
+          COMMENTS: `Тип: ${dealData.deal_type}, Создана через премиальную систему`,
+          // Дополнительные поля если нужно
+          UF_CRM_1680000000: dealData.crm_id, // Пример кастомного поля для ID сделки
+          UF_CRM_1680000001: dealData.manager_name, // Пример кастомного поля для менеджера
+        }
+      };
+
+      console.log('Данные для отправки в CRM:', crmDealData);
+
+      // Отправляем запрос в CRM
+      const response = await fetch(`${CRM_CONFIG.restUrl}/crm.deal.add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(crmDealData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Ошибка CRM:', errorText);
+        throw new Error(`CRM error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Сделка создана в CRM, результат:', result);
+      
+      return result.result; // Возвращаем ID созданной сделки в CRM
+      
+    } catch (error) {
+      console.error('Ошибка при создании сделки в CRM:', error);
+      throw error;
+    }
+  }
+
+  // 🔧 Функция для преобразования типа сделки в формат CRM
+  function getCRMDealType(dealType) {
+    const typeMap = {
+      'to': 'GOODS', // ТО - Услуги
+      'pto': 'GOODS', // ПТО - Услуги
+      'comp': 'GOODS', // Комплектующие - Товары
+      'rep': 'SERVICE', // Ремонты - Услуги
+      'eq': 'GOODS', // Оборудование - Товары
+      'rent': 'SERVICE' // Аренда - Услуги
+    };
+    return typeMap[dealType] || 'GOODS';
   }
 
   // 🏆 Турнирная таблица (только менеджеры)
@@ -469,17 +544,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ➕ Форма создания
+  // ➕ Форма создания сделки (С ОБНОВЛЕННЫМ ФУНКЦИОНАЛОМ CRM)
   function showCreateForm(crmId) {
     showScreen('form');
     updateUrl('form');
     document.getElementById('formContainer').innerHTML = `
       <button id="backBtn">← Назад к CRM ID</button>
       <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
+      <div style="margin-bottom: 15px; padding: 10px; background: #e6f7ff; border-radius: 5px;">
+        <strong>⚠️ Внимание:</strong> Сделка будет создана как в локальной базе, так и в CRM системе
+      </div>
       <label>Ваше имя (автоматически):</label>
       <input type="text" id="manager_name" value="${currentUserName || ''}" readonly>
       <label>Сумма договора (₽):</label>
-      <input type="number" id="contract_amount" placeholder="600000" required>
+      <input type="number" id="contract_amount" placeholder="700000" required>
       <label>Сумма предоплаты (₽):</label>
       <input type="number" id="payment_amount" placeholder="140000" required>
       <label>Тип сделки:</label>
@@ -511,8 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="checkbox" id="up_signed"> 
         <label for="up_signed">УПД подписан?</label>
       </div>
-      <button id="createDealBtn" class="btn-success">Создать сделку</button>
+      <button id="createDealBtn" class="btn-success">Создать сделку в CRM и базе</button>
       <div id="createFormResult" class="result"></div>
+      <div id="crmStatus" style="margin-top: 10px; font-size: 12px; color: #666;"></div>
     `;
 
     document.getElementById('deal_type').addEventListener('change', () => {
@@ -534,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const upSigned = document.getElementById('up_signed').checked;
 
       if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-        alert('Заполните все поля');
+        alert('Заполните все обязательные поля');
         return;
       }
 
@@ -557,9 +636,13 @@ document.addEventListener('DOMContentLoaded', () => {
         dealType === 'comp' ? contractAmount * 0.3 :
         dealType === 'rep' ? contractAmount * 0.4 : 0;
 
-      const { error } = await supabaseClient
-        .from('deals')
-        .insert([{
+      // Показываем статус создания
+      document.getElementById('crmStatus').innerHTML = '🔄 Создание сделки в CRM...';
+      document.getElementById('crmStatus').style.color = '#fa8c16';
+
+      try {
+        // 1. Сначала создаем в CRM
+        const crmDealId = await createDealInCRM({
           crm_id: crmId,
           manager_name: managerName,
           deal_type: dealType,
@@ -567,22 +650,63 @@ document.addEventListener('DOMContentLoaded', () => {
           total_paid: totalPaid,
           paid: isFullyPaid,
           up_signed: upSigned,
-          is_first: isFirst,
-          arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
-          annual_contract: annualContract,
-          margin: margin,
-          bonus_paid: bonusPaid
-        }]);
+          is_first: isFirst
+        });
 
-      if (error) {
-        alert('Ошибка: ' + error.message);
-        return;
+        document.getElementById('crmStatus').innerHTML = `✅ Сделка создана в CRM (ID: ${crmDealId})`;
+        document.getElementById('crmStatus').style.color = '#52c41a';
+
+        // 2. Затем сохраняем в локальную базу (Supabase)
+        const { error } = await supabaseClient
+          .from('deals')
+          .insert([{
+            crm_id: crmId,
+            crm_deal_id: crmDealId, // Сохраняем ID сделки из CRM
+            manager_name: managerName,
+            deal_type: dealType,
+            contract_amount: contractAmount,
+            total_paid: totalPaid,
+            paid: isFullyPaid,
+            up_signed: upSigned,
+            is_first: isFirst,
+            arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
+            annual_contract: annualContract,
+            margin: margin,
+            bonus_paid: bonusPaid,
+            created_at: new Date().toISOString()
+          }]);
+
+        if (error) {
+          console.error('Ошибка сохранения в локальную базу:', error);
+          document.getElementById('createFormResult').innerHTML = `
+            ⚠️ Сделка создана в CRM, но возникла ошибка при сохранении в локальную базу:<br>
+            ${error.message}
+          `;
+          document.getElementById('createFormResult').className = 'result warning';
+        } else {
+          document.getElementById('createFormResult').innerHTML = `
+            ✅ Сделка успешно создана!<br>
+            • CRM ID: ${crmId}<br>
+            • ID сделки в CRM: ${crmDealId}<br>
+            • Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}<br>
+            • Маржа: ${margin.toLocaleString('ru-RU')} ₽
+          `;
+          document.getElementById('createFormResult').className = 'result success';
+        }
+
+      } catch (crmError) {
+        console.error('Ошибка при создании сделки:', crmError);
+        document.getElementById('crmStatus').innerHTML = `❌ Ошибка при создании в CRM: ${crmError.message}`;
+        document.getElementById('crmStatus').style.color = '#ff4d4f';
+        
+        document.getElementById('createFormResult').innerHTML = `
+          ❌ Ошибка создания сделки в CRM:<br>
+          ${crmError.message}<br>
+          Проверьте настройки подключения к CRM.
+        `;
+        document.getElementById('createFormResult').className = 'result error';
       }
-
-      document.getElementById('createFormResult').innerHTML = `
-        Сделка создана!<br>
-        Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}
-      `;
+      
       document.getElementById('createFormResult').style.display = 'block';
     });
   }
@@ -651,68 +775,3 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newPaid && bonusPaid === 0) {
           let revenueForBonus = contract_amount;
           if (deal_type === 'to') {
-            const arpuValue = arpu_input || contract_amount / 12;
-            revenueForBonus = arpuValue;
-          }
-          bonusPaid = calculateBonus(deal_type, revenueForBonus, is_first, true, newUpSigned, annual_contract);
-        }
-      }
-
-      const { error } = await supabaseClient
-        .from('deals')
-        .update({
-          total_paid: newTotalPaid,
-          paid: newPaid,
-          up_signed: newUpSigned,
-          bonus_paid: bonusPaid,
-          updated_at: new Date().toISOString()
-        })
-        .eq('crm_id', crm_id);
-
-      if (error) {
-        alert('Ошибка: ' + error.message);
-        return;
-      }
-
-      document.getElementById('updateFormResult').innerHTML = `
-        Сделка обновлена!<br>
-        ${newPaid && bonusPaid > 0 ? `Начислена премия: ${bonusPaid.toLocaleString('ru-RU')} ₽` : 'Премия не начислена'}
-      `;
-      document.getElementById('updateFormResult').style.display = 'block';
-    });
-  }
-
-  // 🔙 Назад
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'backBtn') {
-      document.getElementById('monthResult').style.display = 'none';
-      
-      // В зависимости от роли пользователя возвращаемся на нужный экран
-      if (currentUserRole === 'rop') {
-        showScreen('rop');
-        updateUrl('rop');
-      } else if (currentUserRole === 'fin') {
-        showScreen('fin');
-        updateUrl('fin');
-      } else if (currentUserRole === 'gen') {
-        showScreen('gen');
-        updateUrl('gen');
-      } else {
-        showScreen('crm');
-        updateUrl('crm');
-      }
-    }
-  });
-
-  // 🌐 Инициализация из URL
-  const screenFromUrl = window.location.hash.replace('#', '') || 'login';
-  showScreen(screenFromUrl);
-
-  // 🔙 Поддержка кнопки "Назад" в браузере
-  window.addEventListener('popstate', (event) => {
-    const screen = event.state?.screen || 'login';
-    showScreen(screen);
-  });
-  
-  console.log('app.js: Инициализация завершена');
-});
