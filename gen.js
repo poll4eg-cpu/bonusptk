@@ -1,4 +1,4 @@
-// gen.js — улучшенная панель генерального директора
+// gen.js — панель генерального директора (исправленная версия)
 let revenueChart = null;
 let segmentChart = null;
 let genSupabaseClient = null;
@@ -60,7 +60,7 @@ function addFilters() {
   filterContainer.innerHTML = `
     <div>
       <label style="display:block; margin-bottom:5px; font-weight:bold;">Сегмент:</label>
-      <select id="genSegmentFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd;">
+      <select id="genSegmentFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd; min-width:150px;">
         <option value="">Все сегменты</option>
         <option value="to">ТО</option>
         <option value="pto">ПТО</option>
@@ -72,32 +72,27 @@ function addFilters() {
     </div>
     <div>
       <label style="display:block; margin-bottom:5px; font-weight:bold;">Менеджер:</label>
-      <select id="genManagerFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd;">
+      <select id="genManagerFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd; min-width:150px;">
         <option value="">Все менеджеры</option>
+        <!-- Список загрузится динамически -->
       </select>
     </div>
     <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold;">Отдел:</label>
-      <select id="genDepartmentFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd;">
-        <option value="">Все отделы</option>
-        <option value="sales">Продажи</option>
-        <option value="service">Сервис</option>
-      </select>
-    </div>
-    <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold;">Сравнить с:</label>
-      <select id="genComparePeriod" style="padding:8px; border-radius:4px; border:1px solid #ddd;">
-        <option value="">Нет</option>
-        <option value="previous_month">Предыдущий месяц</option>
-        <option value="same_month_last_year">Этот месяц год назад</option>
-      </select>
+      <button id="resetFilters" style="padding:8px 16px; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer;">
+        Сбросить фильтры
+      </button>
     </div>
   `;
   
   const loadButton = document.getElementById('loadGenData');
-  if (loadButton && loadButton.parentNode) {
-    loadButton.parentNode.insertBefore(filterContainer, loadButton);
-  }
+  loadButton.parentNode.insertBefore(filterContainer, loadButton);
+  
+  // Обработчик сброса фильтров
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    document.getElementById('genSegmentFilter').value = '';
+    document.getElementById('genManagerFilter').value = '';
+    loadGenData();
+  });
 }
 
 async function loadGenData() {
@@ -113,10 +108,7 @@ async function loadGenData() {
 
   try {
     // Показываем загрузку
-    document.getElementById('totalRevenue').textContent = 'Загрузка...';
-    document.getElementById('totalMargin').textContent = 'Загрузка...';
-    document.getElementById('marginPercent').textContent = '...';
-    document.getElementById('totalDeals').textContent = '...';
+    showLoadingState();
     
     // Получаем фильтры
     const segmentFilter = document.getElementById('genSegmentFilter')?.value || '';
@@ -125,7 +117,7 @@ async function loadGenData() {
     // Загружаем сделки с фильтрами
     let query = genSupabaseClient
       .from('deals')
-      .select('crm_id, manager_name, deal_type, contract_amount, margin, total_paid, created_at, paid, up_signed')
+      .select('crm_id, manager_name, deal_type, contract_amount, total_paid, created_at, paid, up_signed, is_first, arpu_input')
       .gte('created_at', dateFrom)
       .lte('created_at', dateTo + 'T23:59:59');
     
@@ -156,8 +148,8 @@ async function loadGenData() {
 
     // Агрегация данных
     let totalRevenue = 0;
-    let totalTheoreticalMargin = 0; // Теоретическая маржа
-    let totalActualMargin = 0;      // Фактическая маржа (с учетом расходов)
+    let totalTheoreticalMargin = 0; // Теоретическая маржа (рассчитывается!)
+    let totalActualMargin = 0;      // Фактическая маржа (выручка - расходы)
     let totalDeals = deals.length;
     let totalExpenses = 0;
     
@@ -171,7 +163,10 @@ async function loadGenData() {
     deals.forEach(deal => {
       const amount = deal.contract_amount || 0;
       const expenses = expMap[deal.crm_id] || 0;
-      const theoreticalMargin = deal.margin || 0;
+      
+      // ✅ РАССЧИТЫВАЕМ ТЕОРЕТИЧЕСКУЮ МАРЖУ ПО ФОРМУЛЕ
+      const theoreticalMargin = calculateTheoreticalMargin(deal.deal_type, amount);
+      // ✅ Фактическая маржа = Выручка - Расходы
       const actualMargin = amount - expenses;
       
       totalRevenue += amount;
@@ -182,19 +177,21 @@ async function loadGenData() {
       // Сегменты
       const segment = deal.deal_type || 'other';
       if (!segmentData[segment]) {
-        segmentData[segment] = { revenue: 0, margin: 0, deals: 0 };
+        segmentData[segment] = { revenue: 0, theoreticalMargin: 0, actualMargin: 0, deals: 0 };
       }
       segmentData[segment].revenue += amount;
-      segmentData[segment].margin += actualMargin;
+      segmentData[segment].theoreticalMargin += theoreticalMargin;
+      segmentData[segment].actualMargin += actualMargin;
       segmentData[segment].deals += 1;
       
       // Менеджеры
       const manager = deal.manager_name || 'Неизвестно';
       if (!managerData[manager]) {
-        managerData[manager] = { revenue: 0, margin: 0, deals: 0 };
+        managerData[manager] = { revenue: 0, theoreticalMargin: 0, actualMargin: 0, deals: 0 };
       }
       managerData[manager].revenue += amount;
-      managerData[manager].margin += actualMargin;
+      managerData[manager].theoreticalMargin += theoreticalMargin;
+      managerData[manager].actualMargin += actualMargin;
       managerData[manager].deals += 1;
       
       // Топ сделок по марже
@@ -203,19 +200,23 @@ async function loadGenData() {
         manager: manager,
         amount: amount,
         expenses: expenses,
-        margin: actualMargin,
-        marginPercent: amount > 0 ? (actualMargin / amount * 100) : 0
+        theoreticalMargin: theoreticalMargin,
+        actualMargin: actualMargin,
+        marginPercent: amount > 0 ? (actualMargin / amount * 100) : 0,
+        segment: segment
       });
       
-      // Проблемные сделки
+      // Проблемные сделки (расходы > 50% от суммы)
       if (amount > 0) {
         const expensePercent = (expenses / amount) * 100;
-        if (expensePercent > 70) {
+        if (expensePercent > 50) {
           problemDeals.push({
             crm_id: deal.crm_id,
             manager: manager,
             amount: amount,
             expenses: expenses,
+            theoreticalMargin: theoreticalMargin,
+            actualMargin: actualMargin,
             expensePercent: expensePercent.toFixed(1)
           });
         }
@@ -224,31 +225,38 @@ async function loadGenData() {
       // Группировка по неделям
       const week = getWeekNumber(new Date(deal.created_at));
       if (!weeklyData[week]) {
-        weeklyData[week] = { revenue: 0, margin: 0, deals: 0, theoreticalMargin: 0 };
+        weeklyData[week] = { revenue: 0, theoreticalMargin: 0, actualMargin: 0, deals: 0 };
       }
       weeklyData[week].revenue += amount;
-      weeklyData[week].margin += actualMargin;
       weeklyData[week].theoreticalMargin += theoreticalMargin;
+      weeklyData[week].actualMargin += actualMargin;
       weeklyData[week].deals += 1;
     });
     
     // Сортируем топ сделок
-    topDeals.sort((a, b) => b.margin - a.margin);
+    topDeals.sort((a, b) => b.actualMargin - a.actualMargin);
     const top10Deals = topDeals.slice(0, 10);
     
     // Сортируем менеджеров
     const topManagers = Object.entries(managerData)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([name, data]) => ({ 
+        name, 
+        revenue: data.revenue,
+        theoreticalMargin: data.theoreticalMargin,
+        actualMargin: data.actualMargin,
+        deals: data.deals,
+        profitability: data.revenue > 0 ? (data.actualMargin / data.revenue * 100) : 0
+      }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
     // Рассчитываем проценты
-    const marginPercent = totalRevenue > 0 ? ((totalActualMargin / totalRevenue) * 100) : 0;
-    const avgDealSize = totalDeals > 0 ? totalRevenue / totalDeals : 0;
+    const actualMarginPercent = totalRevenue > 0 ? ((totalActualMargin / totalRevenue) * 100) : 0;
     const theoreticalMarginPercent = totalRevenue > 0 ? ((totalTheoreticalMargin / totalRevenue) * 100) : 0;
+    const avgDealSize = totalDeals > 0 ? totalRevenue / totalDeals : 0;
     
     // Обновляем KPI блоки
-    updateKPIBlocks(totalRevenue, totalActualMargin, marginPercent, totalDeals, avgDealSize, totalTheoreticalMargin, theoreticalMarginPercent);
+    updateKPIBlocks(totalRevenue, totalActualMargin, actualMarginPercent, totalDeals, avgDealSize, totalTheoreticalMargin, theoreticalMarginPercent, totalExpenses);
     
     // Рендерим графики
     renderCharts(weeklyData, segmentData);
@@ -259,8 +267,13 @@ async function loadGenData() {
     // Показываем предупреждения
     showAlerts(problemDeals, deals, expMap);
     
-    // Заполняем список менеджеров для фильтра
-    populateManagerFilter(managerData);
+    // Заполняем список менеджеров ВСЕХ
+    await populateManagerFilter();
+    
+    // Восстанавливаем выбранного менеджера после обновления списка
+    if (managerFilter) {
+      document.getElementById('genManagerFilter').value = managerFilter;
+    }
 
   } catch (error) {
     console.error('Ошибка загрузки данных гендира:', error);
@@ -268,15 +281,41 @@ async function loadGenData() {
   }
 }
 
+// ✅ Функция расчета теоретической маржи по формуле
+function calculateTheoreticalMargin(dealType, amount) {
+  if (!dealType || !amount || amount <= 0) return 0;
+  
+  switch(dealType) {
+    case 'to':
+    case 'pto':
+    case 'rent':
+      return Math.round(amount * 0.7 * 100) / 100; // 70%
+    case 'eq':
+      return Math.round(amount * 0.2 * 100) / 100; // 20%
+    case 'comp':
+    case 'rep':
+      return Math.round(amount * 0.3 * 100) / 100; // 30%
+    default:
+      return Math.round(amount * 0.5 * 100) / 100; // 50% по умолчанию
+  }
+}
+
+function showLoadingState() {
+  document.getElementById('totalRevenue').textContent = 'Загрузка...';
+  document.getElementById('totalMargin').textContent = 'Загрузка...';
+  document.getElementById('marginPercent').textContent = '...';
+  document.getElementById('totalDeals').textContent = '...';
+}
+
 // Обновление KPI блоков
-function updateKPIBlocks(revenue, margin, marginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent) {
-  // Основные KPI
+function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
+  // Основные KPI (фактические значения)
   document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
-  document.getElementById('totalMargin').textContent = formatCurrency(margin);
-  document.getElementById('marginPercent').textContent = marginPercent.toFixed(1) + '%';
+  document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
+  document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
   document.getElementById('totalDeals').textContent = deals;
   
-  // Создаем дополнительные KPI блоки если их нет
+  // Создаем или обновляем дополнительные KPI блоки
   let kpiContainer = document.querySelector('.kpi-container');
   if (!kpiContainer) {
     kpiContainer = document.createElement('div');
@@ -296,25 +335,33 @@ function updateKPIBlocks(revenue, margin, marginPercent, deals, avgDeal, theoret
   
   // Дополнительные KPI
   kpiContainer.innerHTML = `
-    <div style="background:#f0f9ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin:0 0 10px 0; color:#1890ff;">Теор. маржа</h3>
-      <p id="theoreticalMargin" style="font-size:24px; margin:0; font-weight:bold;">${formatCurrency(theoreticalMargin)}</p>
-      <small style="color:#666;">${theoreticalMarginPercent.toFixed(1)}%</small>
+    <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
+      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
+        ${formatCurrency(theoreticalMargin)}
+      </p>
+      <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
     </div>
-    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin:0 0 10px 0; color:#52c41a;">Средний чек</h3>
-      <p id="avgDealSize" style="font-size:24px; margin:0; font-weight:bold;">${formatCurrency(avgDeal)}</p>
-      <small style="color:#666;">на сделку</small>
+    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
+      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
+        ${formatCurrency(avgDeal)}
+      </p>
+      <small style="color:#52c41a;">на сделку</small>
     </div>
-    <div style="background:#fff0f6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin:0 0 10px 0; color:#eb2f96;">Расходы</h3>
-      <p id="totalExpenses" style="font-size:24px; margin:0; font-weight:bold;">${formatCurrency(totalExpenses)}</p>
-      <small style="color:#666;">всего</small>
+    <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
+      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
+        ${formatCurrency(expenses)}
+      </p>
+      <small style="color:#ff4d4f;">всего</small>
     </div>
-    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3 style="margin:0 0 10px 0; color:#faad14;">Рентабельность</h3>
-      <p id="profitability" style="font-size:24px; margin:0; font-weight:bold;">${marginPercent.toFixed(1)}%</p>
-      <small style="color:#666;">фактическая</small>
+    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffe58f;">
+      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:16px;">📈 Рентабельность</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#faad14;">
+        ${actualMarginPercent.toFixed(1)}%
+      </p>
+      <small style="color:#faad14;">фактическая</small>
     </div>
   `;
 }
@@ -324,13 +371,18 @@ function renderCharts(weeklyData, segmentData) {
   const ctx1 = document.getElementById('revenueChart').getContext('2d');
   
   if (revenueChart) revenueChart.destroy();
+  if (segmentChart) segmentChart.destroy();
 
-  // График 1: Динамика по неделям
+  // ✅ График 1: Динамика по неделям - ФИКСИРОВАННЫЙ РАЗМЕР
   const labels = Object.keys(weeklyData).sort();
   const revenueData = labels.map(w => weeklyData[w].revenue);
-  const marginData = labels.map(w => weeklyData[w].margin);
   const theoreticalMarginData = labels.map(w => weeklyData[w].theoreticalMargin);
+  const actualMarginData = labels.map(w => weeklyData[w].actualMargin);
 
+  // Создаем контейнер для первого графика с фиксированной высотой
+  let chart1Container = document.getElementById('revenueChart').parentNode;
+  chart1Container.style.height = '300px'; // Фиксированная высота
+  
   revenueChart = new Chart(ctx1, {
     type: 'line',
     data: {
@@ -343,33 +395,40 @@ function renderCharts(weeklyData, segmentData) {
           borderColor: 'rgba(24, 144, 255, 1)',
           borderWidth: 2,
           tension: 0.3,
-          fill: true
+          fill: false
         },
         {
-          label: 'Фактическая маржа',
-          data: marginData,
+          label: 'Теор. маржа',
+          data: theoreticalMarginData,
+          backgroundColor: 'rgba(250, 173, 20, 0.1)',
+          borderColor: 'rgba(250, 173, 20, 1)',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: false,
+          borderDash: [5, 5]
+        },
+        {
+          label: 'Факт. маржа',
+          data: actualMarginData,
           backgroundColor: 'rgba(82, 196, 26, 0.1)',
           borderColor: 'rgba(82, 196, 26, 1)',
           borderWidth: 2,
           tension: 0.3,
-          fill: true
-        },
-        {
-          label: 'Теоретическая маржа',
-          data: theoreticalMarginData,
-          backgroundColor: 'rgba(255, 191, 0, 0.1)',
-          borderColor: 'rgba(255, 191, 0, 1)',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: true
+          fill: false
         }
       ]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false, // Важно для фиксированной высоты
       plugins: {
         legend: {
           position: 'top',
+          labels: {
+            font: {
+              size: 11
+            }
+          }
         },
         tooltip: {
           callbacks: {
@@ -385,6 +444,16 @@ function renderCharts(weeklyData, segmentData) {
           ticks: {
             callback: function(value) {
               return formatCurrency(value, true);
+            },
+            font: {
+              size: 10
+            }
+          }
+        },
+        x: {
+          ticks: {
+            font: {
+              size: 10
             }
           }
         }
@@ -392,16 +461,34 @@ function renderCharts(weeklyData, segmentData) {
     }
   });
 
-  // График 2: Распределение по сегментам
-  const segmentCanvas = document.getElementById('segmentChart');
-  if (segmentCanvas) {
-    if (segmentChart) segmentChart.destroy();
-
-    const segmentLabels = Object.keys(segmentData);
+  // ✅ График 2: Распределение по сегментам - МАЛЕНЬКИЙ
+  let segmentCanvas = document.getElementById('segmentChart');
+  if (!segmentCanvas) {
+    const chartContainer = document.querySelector('#revenueChart').parentNode.parentNode;
+    
+    // Создаем контейнер для второго графика
+    const segmentContainer = document.createElement('div');
+    segmentContainer.style.cssText = `
+      margin-top: 20px;
+      width: 100%;
+      height: 200px; // ✅ Маленькая высота
+      position: relative;
+    `;
+    
+    segmentContainer.innerHTML = '<h3 style="margin-bottom:10px; font-size:14px;">Распределение по сегментам</h3>';
+    
+    segmentCanvas = document.createElement('canvas');
+    segmentCanvas.id = 'segmentChart';
+    segmentContainer.appendChild(segmentCanvas);
+    chartContainer.appendChild(segmentContainer);
+  }
+  
+  const segmentLabels = Object.keys(segmentData);
+  if (segmentLabels.length > 0) {
     const segmentRevenue = segmentLabels.map(s => segmentData[s].revenue);
     
     segmentChart = new Chart(segmentCanvas.getContext('2d'), {
-      type: 'pie',
+      type: 'doughnut',
       data: {
         labels: segmentLabels.map(s => getSegmentLabel(s)),
         datasets: [{
@@ -409,22 +496,30 @@ function renderCharts(weeklyData, segmentData) {
           backgroundColor: [
             '#1890ff', '#52c41a', '#faad14', '#eb2f96',
             '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
-          ]
+          ],
+          borderWidth: 1
         }]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
             position: 'right',
-          },
-          title: {
-            display: true,
-            text: 'Распределение по сегментам'
+            labels: {
+              boxWidth: 10,
+              font: {
+                size: 9 // ✅ Очень маленький шрифт
+              },
+              padding: 8
+            }
           }
-        }
+        },
+        cutout: '60%' // ✅ Тонкий пончик
       }
     });
+  } else {
+    segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
   }
 }
 
@@ -438,33 +533,35 @@ function showAnalytics(topDeals, topManagers, segmentData) {
       margin-top: 30px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 15px;
     `;
     document.querySelector('#genScreen .card').appendChild(analyticsDiv);
   }
   
   // Топ сделок
   analyticsDiv.innerHTML = `
-    <div style="background:white; padding:15px; border-radius:8px; border:1px solid #eee;">
-      <h3 style="margin-top:0;">🏆 Топ-10 сделок по марже</h3>
-      <div style="max-height:300px; overflow-y:auto;">
-        <table style="width:100%; font-size:14px;">
+    <div style="background:white; padding:12px; border-radius:6px; border:1px solid #eee; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+      <h3 style="margin-top:0; margin-bottom:10px; font-size:14px; color:#1890ff;">🏆 Топ-10 сделок по марже</h3>
+      <div style="max-height:250px; overflow-y:auto; font-size:12px;">
+        <table style="width:100%; font-size:12px; border-collapse:collapse;">
           <thead>
             <tr style="background:#fafafa;">
-              <th style="padding:8px; text-align:left;">CRM ID</th>
-              <th style="padding:8px; text-align:left;">Менеджер</th>
-              <th style="padding:8px; text-align:left;">Сумма</th>
-              <th style="padding:8px; text-align:left;">Маржа</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">CRM ID</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Сумма</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Факт. маржа</th>
             </tr>
           </thead>
           <tbody>
             ${topDeals.map(deal => `
               <tr>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${deal.crm_id}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${deal.manager}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${formatCurrency(deal.amount)}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee; color:${deal.marginPercent > 20 ? '#52c41a' : '#faad14'}">
-                  ${formatCurrency(deal.margin)} (${deal.marginPercent.toFixed(1)}%)
+                <td style="padding:6px; border-bottom:1px solid #eee;">
+                  <div><strong>${deal.crm_id}</strong></div>
+                  <div style="font-size:10px; color:#666;">${deal.manager}</div>
+                </td>
+                <td style="padding:6px; border-bottom:1px solid #eee;">${formatCurrency(deal.amount, true)}</td>
+                <td style="padding:6px; border-bottom:1px solid #eee; color:${deal.marginPercent > 20 ? '#52c41a' : deal.marginPercent > 0 ? '#faad14' : '#ff4d4f'}">
+                  ${formatCurrency(deal.actualMargin, true)}<br>
+                  <small style="font-size:10px;">${deal.marginPercent.toFixed(1)}%</small>
                 </td>
               </tr>
             `).join('')}
@@ -473,26 +570,28 @@ function showAnalytics(topDeals, topManagers, segmentData) {
       </div>
     </div>
     
-    <div style="background:white; padding:15px; border-radius:8px; border:1px solid #eee;">
-      <h3 style="margin-top:0;">👥 Топ-5 менеджеров</h3>
-      <div style="max-height:300px; overflow-y:auto;">
-        <table style="width:100%; font-size:14px;">
+    <div style="background:white; padding:12px; border-radius:6px; border:1px solid #eee; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+      <h3 style="margin-top:0; margin-bottom:10px; font-size:14px; color:#1890ff;">👥 Топ-5 менеджеров</h3>
+      <div style="max-height:250px; overflow-y:auto; font-size:12px;">
+        <table style="width:100%; font-size:12px; border-collapse:collapse;">
           <thead>
             <tr style="background:#fafafa;">
-              <th style="padding:8px; text-align:left;">Менеджер</th>
-              <th style="padding:8px; text-align:left;">Сделок</th>
-              <th style="padding:8px; text-align:left;">Выручка</th>
-              <th style="padding:8px; text-align:left;">Маржа</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Менеджер</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Выручка</th>
+              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Рентаб.</th>
             </tr>
           </thead>
           <tbody>
             ${topManagers.map(manager => `
               <tr>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${manager.name}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${manager.deals}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee;">${formatCurrency(manager.revenue)}</td>
-                <td style="padding:8px; border-bottom:1px solid #eee; color:${manager.margin > 0 ? '#52c41a' : '#ff4d4f'}">
-                  ${formatCurrency(manager.margin)}
+                <td style="padding:6px; border-bottom:1px solid #eee;">
+                  <strong>${manager.name}</strong><br>
+                  <small style="font-size:10px; color:#666;">${manager.deals} сделок</small>
+                </td>
+                <td style="padding:6px; border-bottom:1px solid #eee;">${formatCurrency(manager.revenue, true)}</td>
+                <td style="padding:6px; border-bottom:1px solid #eee; color:${manager.profitability > 20 ? '#52c41a' : manager.profitability > 0 ? '#faad14' : '#ff4d4f'}">
+                  ${manager.profitability.toFixed(1)}%<br>
+                  <small style="font-size:10px;">${formatCurrency(manager.actualMargin, true)}</small>
                 </td>
               </tr>
             `).join('')}
@@ -503,124 +602,77 @@ function showAnalytics(topDeals, topManagers, segmentData) {
   `;
 }
 
+// Заполняем список ВСЕХ менеджеров
+async function populateManagerFilter() {
+  try {
+    // Загружаем ВСЕХ менеджеров (ограничиваем последними 1000 сделок для скорости)
+    const { data: allManagers, error } = await genSupabaseClient
+      .from('deals')
+      .select('manager_name')
+      .not('manager_name', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    
+    if (error) throw error;
+    
+    const uniqueManagers = [...new Set(allManagers.map(m => m.manager_name).filter(Boolean))].sort();
+    
+    const filter = document.getElementById('genManagerFilter');
+    if (filter) {
+      filter.innerHTML = '<option value="">Все менеджеры</option>' +
+        uniqueManagers.map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+    
+  } catch (error) {
+    console.error('Ошибка загрузки списка менеджеров:', error);
+  }
+}
+
 // Показать предупреждения
 function showAlerts(problemDeals, allDeals, expMap) {
   const alertsDiv = document.getElementById('alerts');
-  if (!alertsDiv) {
-    // Создаем контейнер для предупреждений
-    const card = document.querySelector('#genScreen .card');
-    if (card) {
-      const newDiv = document.createElement('div');
-      newDiv.id = 'alerts';
-      newDiv.style.cssText = `
-        margin-top: 30px;
-        padding: 20px;
-        background: #fafafa;
-        border-radius: 8px;
-        border: 1px solid #eee;
-      `;
-      card.appendChild(newDiv);
-    }
-  }
-
-  const alertsDivElement = document.getElementById('alerts');
-  if (!alertsDivElement) return;
-
-  alertsDivElement.innerHTML = '<h3>🚨 Предупреждения и уведомления</h3>';
+  alertsDiv.innerHTML = '<h3 style="font-size:16px; margin-bottom:15px;">🚨 Предупреждения</h3>';
   
-  // 1. Сделки с высокими расходами
+  // 1. Сделки с высокими расходами (>50%)
   if (problemDeals.length > 0) {
     const alertEl = document.createElement('div');
     alertEl.style.cssText = `
-      padding: 12px;
+      padding: 10px;
       background: #fff2f0;
       border-left: 4px solid #ff4d4f;
       margin-bottom: 10px;
       border-radius: 4px;
+      font-size: 13px;
     `;
     alertEl.innerHTML = `
-      <strong>⚠️ Высокие расходы (>70% от суммы):</strong><br>
-      ${problemDeals.map(d => 
-        `<div style="margin-top:5px;">
-          <strong>${d.crm_id}</strong> (${d.manager}): 
-          ${formatCurrency(d.amount)} → расходы ${formatCurrency(d.expenses)} (${d.expensePercent}%)
-        </div>`
-      ).join('')}
+      <strong style="color:#ff4d4f;">⚠️ Высокие расходы (>50%):</strong><br>
+      <div style="margin-top:5px; max-height:150px; overflow-y:auto;">
+        ${problemDeals.slice(0, 5).map(d => 
+          `<div style="margin-bottom:3px; padding:3px 0; border-bottom:1px dashed #ffccc7;">
+            <strong>${d.crm_id}</strong> (${d.manager}): 
+            ${formatCurrency(d.amount, true)} → расходы ${formatCurrency(d.expenses, true)} (${d.expensePercent}%)<br>
+            <small style="color:#666;">Теор. маржа: ${formatCurrency(d.theoreticalMargin, true)} | Факт.: ${formatCurrency(d.actualMargin, true)}</small>
+          </div>`
+        ).join('')}
+        ${problemDeals.length > 5 ? `<div style="color:#666; font-size:11px;">... и ещё ${problemDeals.length - 5} сделок</div>` : ''}
+      </div>
     `;
-    alertsDivElement.appendChild(alertEl);
-  }
-  
-  // 2. Сделки без расходов (старше 7 дней)
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const oldDealsWithoutExpenses = allDeals.filter(deal => {
-    const dealDate = new Date(deal.created_at);
-    return dealDate < weekAgo && (!expMap[deal.crm_id] || expMap[deal.crm_id] === 0);
-  });
-  
-  if (oldDealsWithoutExpenses.length > 0) {
-    const alertEl = document.createElement('div');
-    alertEl.style.cssText = `
-      padding: 12px;
-      background: #fffbe6;
-      border-left: 4px solid #faad14;
-      margin-bottom: 10px;
-      border-radius: 4px;
-    `;
-    alertEl.innerHTML = `
-      <strong>ℹ️ Сделки без расходов более 7 дней:</strong><br>
-      ${oldDealsWithoutExpenses.slice(0, 10).map(d => 
-        `<div style="margin-top:5px;">
-          <strong>${d.crm_id}</strong> (${d.manager_name}): 
-          создана ${new Date(d.created_at).toLocaleDateString()}
-        </div>`
-      ).join('')}
-      ${oldDealsWithoutExpenses.length > 10 ? `<div>... и ещё ${oldDealsWithoutExpenses.length - 10} сделок</div>` : ''}
-    `;
-    alertsDivElement.appendChild(alertEl);
-  }
-  
-  // 3. Сделки без оплаты (старше 30 дней)
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
-  const oldUnpaidDeals = allDeals.filter(deal => {
-    const dealDate = new Date(deal.created_at);
-    return dealDate < monthAgo && (!deal.paid || deal.total_paid < deal.contract_amount);
-  });
-  
-  if (oldUnpaidDeals.length > 0) {
-    const alertEl = document.createElement('div');
-    alertEl.style.cssText = `
-      padding: 12px;
-      background: #f0f9ff;
-      border-left: 4px solid #1890ff;
-      margin-bottom: 10px;
-      border-radius: 4px;
-    `;
-    alertEl.innerHTML = `
-      <strong>💸 Просроченная оплата (>30 дней):</strong><br>
-      ${oldUnpaidDeals.slice(0, 5).map(d => 
-        `<div style="margin-top:5px;">
-          <strong>${d.crm_id}</strong> (${d.manager_name}): 
-          оплачено ${formatCurrency(d.total_paid)} из ${formatCurrency(d.contract_amount)}
-        </div>`
-      ).join('')}
-    `;
-    alertsDivElement.appendChild(alertEl);
+    alertsDiv.appendChild(alertEl);
   }
   
   // Если нет предупреждений
-  if (alertsDivElement.children.length === 1) {
+  if (alertsDiv.children.length === 1) {
     const noAlerts = document.createElement('div');
     noAlerts.style.cssText = `
-      padding: 20px;
+      padding: 15px;
       text-align: center;
       color: #666;
       background: #fafafa;
       border-radius: 8px;
+      font-size: 13px;
     `;
     noAlerts.innerHTML = '✅ Все показатели в норме. Критических проблем не обнаружено.';
-    alertsDivElement.appendChild(noAlerts);
+    alertsDiv.appendChild(noAlerts);
   }
 }
 
@@ -650,35 +702,21 @@ function getSegmentLabel(segment) {
   return labels[segment] || segment;
 }
 
-function populateManagerFilter(managerData) {
-  const filter = document.getElementById('genManagerFilter');
-  if (filter) {
-    const managers = Object.keys(managerData).sort();
-    filter.innerHTML = '<option value="">Все менеджеры</option>' +
-      managers.map(m => `<option value="${m}">${m}</option>`).join('');
-  }
-}
-
 // Переход к панели финансиста
 function goToFinPanel() {
   console.log('Переход к финансовому контролю...');
   
-  // Скрываем панель гендира
   document.getElementById('genScreen').style.display = 'none';
-  
-  // Показываем панель финансиста
   const finScreen = document.getElementById('finScreen');
   if (finScreen) {
     finScreen.style.display = 'block';
     
-    // Загружаем модуль финансиста если не загружен
     if (typeof window.initFinPanel !== 'function') {
       const script = document.createElement('script');
       script.src = 'fin.js';
       script.onload = () => {
         if (typeof initFinPanel === 'function') {
           initFinPanel(genSupabaseClient, genCurrentUserPhone, genCurrentUserName, () => {
-            // Callback для возврата назад
             document.getElementById('finScreen').style.display = 'none';
             document.getElementById('genScreen').style.display = 'block';
           });
@@ -715,15 +753,14 @@ async function exportToExcel() {
     if (error) throw error;
     
     // Формируем CSV
-    const headers = ['CRM ID', 'Менеджер', 'Тип', 'Договор', 'Оплачено', 'Маржа', 'Премия', 'Дата создания'];
+    const headers = ['CRM ID', 'Менеджер', 'Тип', 'Договор', 'Оплачено', 'Теор. маржа', 'Дата создания'];
     const rows = deals.map(deal => [
       deal.crm_id,
       deal.manager_name,
       getSegmentLabel(deal.deal_type),
       deal.contract_amount,
       deal.total_paid,
-      deal.margin,
-      deal.bonus_paid,
+      calculateTheoreticalMargin(deal.deal_type, deal.contract_amount), // ✅ Рассчитываем теоретическую маржу
       new Date(deal.created_at).toLocaleDateString('ru-RU')
     ]);
     
