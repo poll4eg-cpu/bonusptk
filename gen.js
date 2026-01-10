@@ -301,30 +301,29 @@ function calculateTheoreticalMargin(dealType, amount) {
 }
 
 function showLoadingState() {
-  document.getElementById('totalRevenue').textContent = 'Загрузка...';
-  document.getElementById('totalMargin').textContent = 'Загрузка...';
-  document.getElementById('marginPercent').textContent = '...';
-  document.getElementById('totalDeals').textContent = '...';
+  // Очищаем все KPI блоки
+  const kpis = document.querySelectorAll('.kpi-item');
+  kpis.forEach(kpi => {
+    const valueSpan = kpi.querySelector('.kpi-value');
+    if (valueSpan) valueSpan.textContent = 'Загрузка...';
+    const subtitleSpan = kpi.querySelector('.kpi-subtitle');
+    if (subtitleSpan) subtitleSpan.textContent = '...';
+  });
 }
 
-// Обновление KPI блоков
+// Обновление KPI блоков - ИСПРАВЛЕННАЯ ВЕРСИЯ
 function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
-  // Основные KPI (фактические значения)
-  document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
-  document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
-  document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
-  document.getElementById('totalDeals').textContent = deals;
-  
-  // Создаем или обновляем дополнительные KPI блоки
-  let kpiContainer = document.querySelector('.kpi-container');
+  // Создаем основной контейнер для KPI
+  let kpiContainer = document.querySelector('.kpi-main-container');
   if (!kpiContainer) {
     kpiContainer = document.createElement('div');
-    kpiContainer.className = 'kpi-container';
+    kpiContainer.className = 'kpi-main-container';
     kpiContainer.style.cssText = `
       display: flex;
-      gap: 15px;
       flex-wrap: wrap;
+      gap: 15px;
       margin: 20px 0;
+      justify-content: space-between;
     `;
     
     const existingKPIs = document.querySelector('#genScreen .card > div:first-child');
@@ -333,57 +332,134 @@ function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgD
     }
   }
   
-  // Дополнительные KPI
-  kpiContainer.innerHTML = `
-    <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
-      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
-        ${formatCurrency(theoreticalMargin)}
-      </p>
-      <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
-    </div>
-    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
-      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
-        ${formatCurrency(avgDeal)}
-      </p>
-      <small style="color:#52c41a;">на сделку</small>
-    </div>
-    <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
-      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
-        ${formatCurrency(expenses)}
-      </p>
-      <small style="color:#ff4d4f;">всего</small>
-    </div>
-    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffe58f;">
-      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:16px;">📈 Рентабельность</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#faad14;">
-        ${actualMarginPercent.toFixed(1)}%
-      </p>
-      <small style="color:#faad14;">фактическая</small>
-    </div>
-  `;
+  // Очищаем и заполняем контейнер
+  kpiContainer.innerHTML = '';
+  
+  // Функция для создания KPI элемента
+  function createKPIElement(title, value, subtitle, color, icon) {
+    const kpi = document.createElement('div');
+    kpi.className = 'kpi-item';
+    kpi.style.cssText = `
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border: 1px solid #eee;
+      min-width: 180px;
+      flex: 1;
+      min-width: 180px;
+    `;
+    
+    kpi.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 20px; margin-right: 8px; color: ${color}">${icon}</span>
+        <h3 style="margin: 0; font-size: 14px; color: #333; font-weight: 600;">${title}</h3>
+      </div>
+      <div class="kpi-value" style="font-size: 24px; font-weight: bold; color: ${color}; margin-bottom: 5px;">
+        ${value}
+      </div>
+      <div class="kpi-subtitle" style="font-size: 12px; color: #666;">
+        ${subtitle}
+      </div>
+    `;
+    
+    return kpi;
+  }
+  
+  // ✅ 1. Выручка
+  kpiContainer.appendChild(createKPIElement(
+    'Выручка',
+    formatCurrency(revenue),
+    'Общая сумма контрактов',
+    '#1890ff',
+    '💰'
+  ));
+  
+  // ✅ 2. Теоретическая маржа (НОВЫЙ КВАДРАТИК)
+  kpiContainer.appendChild(createKPIElement(
+    'Теор. маржа',
+    formatCurrency(theoreticalMargin),
+    `${theoreticalMarginPercent.toFixed(1)}% от выручки`,
+    '#faad14',
+    '📊'
+  ));
+  
+  // ✅ 3. Фактическая маржа (рассчитывается как выручка - расходы)
+  kpiContainer.appendChild(createKPIElement(
+    'Факт. маржа',
+    formatCurrency(actualMargin),
+    `${actualMarginPercent.toFixed(1)}% от выручки`,
+    '#52c41a',
+    '✅'
+  ));
+  
+  // ✅ 4. Маржинальность (процент от выручки)
+  kpiContainer.appendChild(createKPIElement(
+    'Маржинальность',
+    `${actualMarginPercent.toFixed(1)}%`,
+    'Фактическая рентабельность',
+    '#eb2f96',
+    '📈'
+  ));
+  
+  // ✅ 5. Количество сделок
+  kpiContainer.appendChild(createKPIElement(
+    'Сделок',
+    totalDeals,
+    `Средний чек: ${formatCurrency(avgDeal, true)}`,
+    '#722ed1',
+    '📋'
+  ));
+  
+  // ✅ 6. Расходы
+  kpiContainer.appendChild(createKPIElement(
+    'Расходы',
+    formatCurrency(expenses),
+    'Фактические затраты',
+    '#ff4d4f',
+    '💸'
+  ));
 }
 
-// Рендер графиков
+// Рендер графиков - ИСПРАВЛЕННАЯ ВЕРСИЯ (без наползания)
 function renderCharts(weeklyData, segmentData) {
   const ctx1 = document.getElementById('revenueChart').getContext('2d');
   
+  // Уничтожаем старые графики
   if (revenueChart) revenueChart.destroy();
   if (segmentChart) segmentChart.destroy();
-
-  // ✅ График 1: Динамика по неделям - ФИКСИРОВАННЫЙ РАЗМЕР
+  
+  // Создаем контейнер для графиков
+  const chartsContainer = document.querySelector('#revenueChart').parentNode;
+  chartsContainer.innerHTML = `
+    <div style="margin-bottom: 30px;">
+      <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Динамика по неделям</h3>
+      <div style="position: relative; height: 350px;">
+        <canvas id="revenueChart"></canvas>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Распределение по сегментам</h3>
+      <div style="position: relative; height: 300px; display: flex;">
+        <div style="flex: 1; max-width: 60%;">
+          <canvas id="segmentChart"></canvas>
+        </div>
+        <div style="flex: 1; padding-left: 20px;">
+          <div id="segmentLegend" style="max-height: 250px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const newCtx1 = document.getElementById('revenueChart').getContext('2d');
+  
+  // ✅ График 1: Динамика по неделям
   const labels = Object.keys(weeklyData).sort();
   const revenueData = labels.map(w => weeklyData[w].revenue);
   const theoreticalMarginData = labels.map(w => weeklyData[w].theoreticalMargin);
   const actualMarginData = labels.map(w => weeklyData[w].actualMargin);
 
-  // Создаем контейнер для первого графика с фиксированной высотой
-  let chart1Container = document.getElementById('revenueChart').parentNode;
-  chart1Container.style.height = '300px'; // Фиксированная высота
-  
-  revenueChart = new Chart(ctx1, {
+  revenueChart = new Chart(newCtx1, {
     type: 'line',
     data: {
       labels: labels.map(w => w.replace('-W', ' нед. ')),
@@ -420,13 +496,13 @@ function renderCharts(weeklyData, segmentData) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false, // Важно для фиксированной высоты
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: 'top',
           labels: {
             font: {
-              size: 11
+              size: 12
             }
           }
         },
@@ -446,14 +522,14 @@ function renderCharts(weeklyData, segmentData) {
               return formatCurrency(value, true);
             },
             font: {
-              size: 10
+              size: 11
             }
           }
         },
         x: {
           ticks: {
             font: {
-              size: 10
+              size: 11
             }
           }
         }
@@ -461,42 +537,24 @@ function renderCharts(weeklyData, segmentData) {
     }
   });
 
-  // ✅ График 2: Распределение по сегментам - МАЛЕНЬКИЙ
-  let segmentCanvas = document.getElementById('segmentChart');
-  if (!segmentCanvas) {
-    const chartContainer = document.querySelector('#revenueChart').parentNode.parentNode;
-    
-    // Создаем контейнер для второго графика
-    const segmentContainer = document.createElement('div');
-    segmentContainer.style.cssText = `
-      margin-top: 20px;
-      width: 100%;
-      height: 200px; // ✅ Маленькая высота
-      position: relative;
-    `;
-    
-    segmentContainer.innerHTML = '<h3 style="margin-bottom:10px; font-size:14px;">Распределение по сегментам</h3>';
-    
-    segmentCanvas = document.createElement('canvas');
-    segmentCanvas.id = 'segmentChart';
-    segmentContainer.appendChild(segmentCanvas);
-    chartContainer.appendChild(segmentContainer);
-  }
-  
+  // ✅ График 2: Распределение по сегментам с легендой справа
   const segmentLabels = Object.keys(segmentData);
   if (segmentLabels.length > 0) {
     const segmentRevenue = segmentLabels.map(s => segmentData[s].revenue);
+    const segmentColors = [
+      '#1890ff', '#52c41a', '#faad14', '#eb2f96',
+      '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
+    ];
     
-    segmentChart = new Chart(segmentCanvas.getContext('2d'), {
+    const segmentCtx = document.getElementById('segmentChart').getContext('2d');
+    
+    segmentChart = new Chart(segmentCtx, {
       type: 'doughnut',
       data: {
         labels: segmentLabels.map(s => getSegmentLabel(s)),
         datasets: [{
           data: segmentRevenue,
-          backgroundColor: [
-            '#1890ff', '#52c41a', '#faad14', '#eb2f96',
-            '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
-          ],
+          backgroundColor: segmentColors.slice(0, segmentLabels.length),
           borderWidth: 1
         }]
       },
@@ -505,23 +563,79 @@ function renderCharts(weeklyData, segmentData) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'right',
-            labels: {
-              boxWidth: 10,
-              font: {
-                size: 9 // ✅ Очень маленький шрифт
-              },
-              padding: 8
+            display: false // Скрываем стандартную легенду
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw;
+                const total = segmentRevenue.reduce((a, b) => a + b, 0);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+              }
             }
           }
         },
-        cutout: '60%' // ✅ Тонкий пончик
+        cutout: '50%'
       }
     });
+    
+    // Создаем кастомную легенду
+    const legendContainer = document.getElementById('segmentLegend');
+    legendContainer.innerHTML = '';
+    
+    segmentLabels.forEach((segment, index) => {
+      const legendItem = document.createElement('div');
+      legendItem.style.cssText = `
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        padding: 5px;
+        border-radius: 4px;
+        background: ${index % 2 === 0 ? '#fafafa' : 'white'};
+      `;
+      
+      const colorBox = document.createElement('div');
+      colorBox.style.cssText = `
+        width: 12px;
+        height: 12px;
+        background: ${segmentColors[index]};
+        border-radius: 2px;
+        margin-right: 8px;
+      `;
+      
+      const labelText = document.createElement('div');
+      labelText.style.cssText = `
+        font-size: 12px;
+        flex: 1;
+      `;
+      
+      const valueText = document.createElement('div');
+      valueText.style.cssText = `
+        font-size: 11px;
+        font-weight: bold;
+        color: #333;
+      `;
+      
+      const value = segmentData[segment].revenue;
+      const total = segmentRevenue.reduce((a, b) => a + b, 0);
+      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+      
+      labelText.textContent = getSegmentLabel(segment);
+      valueText.textContent = `${formatCurrency(value, true)} (${percentage}%)`;
+      
+      legendItem.appendChild(colorBox);
+      legendItem.appendChild(labelText);
+      legendItem.appendChild(valueText);
+      legendContainer.appendChild(legendItem);
+    });
   } else {
-    segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
+    document.getElementById('segmentChart').parentNode.innerHTML = 
+      '<p style="text-align:center; color:#666; padding:40px; font-size:14px;">Нет данных для графика сегментов</p>';
   }
 }
+
+// Остальные функции остаются без изменений (showAnalytics, populateManagerFilter, showAlerts и т.д.)
 
 // Показать аналитику
 function showAnalytics(topDeals, topManagers, segmentData) {
