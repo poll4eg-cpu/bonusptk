@@ -1,6 +1,5 @@
-// gen.js — панель генерального директора (исправленная версия)
+// gen.js — минималистичная панель гендира (рабочая)
 let revenueChart = null;
-let segmentChart = null;
 let genSupabaseClient = null;
 let genCurrentUserPhone = null;
 let genCurrentUserName = null;
@@ -12,7 +11,7 @@ function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
   genCurrentUserPhone = currentUserPhone;
   genCurrentUserName = currentUserName;
 
-  // Установите период по умолчанию (последние 3 месяца)
+  // Установите период по умолчанию
   const today = new Date();
   const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
   document.getElementById('genDateFrom').valueAsDate = threeMonthsAgo;
@@ -43,7 +42,7 @@ function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
   loadGenData(); // загрузить при старте
 }
 
-// Добавление фильтров — ИСПРАВЛЕНО: кнопка читаемая
+// Добавление фильтров — читаемая кнопка
 function addFilters() {
   const filterContainer = document.createElement('div');
   filterContainer.style.cssText = `
@@ -74,11 +73,9 @@ function addFilters() {
       <label style="display:block; margin-bottom:5px; font-weight:bold;">Менеджер:</label>
       <select id="genManagerFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd; min-width:150px;">
         <option value="">Все менеджеры</option>
-        <!-- Список загрузится динамически -->
       </select>
     </div>
     <div>
-      <!-- ✅ ИСПРАВЛЕНО: кнопка читаемая -->
       <button id="resetFilters" class="btn-secondary" style="padding:8px 16px; height:38px;">
         Сбросить фильтры
       </button>
@@ -149,8 +146,8 @@ async function loadGenData() {
 
     // Агрегация данных
     let totalRevenue = 0;
-    let totalTheoreticalMargin = 0; // Теоретическая маржа (рассчитывается!)
-    let totalActualMargin = 0;      // Фактическая маржа (выручка - расходы)
+    let totalTheoreticalMargin = 0;
+    let totalActualMargin = 0;
     let totalDeals = deals.length;
     let totalExpenses = 0;
     
@@ -165,9 +162,8 @@ async function loadGenData() {
       const amount = deal.contract_amount || 0;
       const expenses = expMap[deal.crm_id] || 0;
       
-      // ✅ РАССЧИТЫВАЕМ ТЕОРЕТИЧЕСКУЮ МАРЖУ ПО ФОРМУЛЕ
+      // Рассчитываем теоретическую маржу
       const theoreticalMargin = calculateTheoreticalMargin(deal.deal_type, amount);
-      // ✅ Фактическая маржа = Выручка - Расходы
       const actualMargin = amount - expenses;
       
       totalRevenue += amount;
@@ -195,7 +191,7 @@ async function loadGenData() {
       managerData[manager].actualMargin += actualMargin;
       managerData[manager].deals += 1;
       
-      // Топ сделок по марже
+      // Топ сделок
       topDeals.push({
         crm_id: deal.crm_id,
         manager: manager,
@@ -207,7 +203,7 @@ async function loadGenData() {
         segment: segment
       });
       
-      // Проблемные сделки (расходы > 50% от суммы)
+      // Проблемные сделки
       if (amount > 0) {
         const expensePercent = (expenses / amount) * 100;
         if (expensePercent > 50) {
@@ -259,8 +255,8 @@ async function loadGenData() {
     // Обновляем KPI блоки
     updateKPIBlocks(totalRevenue, totalActualMargin, actualMarginPercent, totalDeals, avgDealSize, totalTheoreticalMargin, theoreticalMarginPercent, totalExpenses);
     
-    // Рендерим графики
-    renderCharts(weeklyData, segmentData);
+    // Рендерим график
+    renderChart(weeklyData);
     
     // Показываем аналитику
     showAnalytics(top10Deals, topManagers, segmentData);
@@ -268,13 +264,8 @@ async function loadGenData() {
     // Показываем предупреждения
     showAlerts(problemDeals, deals, expMap);
     
-    // Заполняем список менеджеров ВСЕХ
-    await populateManagerFilter();
-    
-    // Восстанавливаем выбранного менеджера после обновления списка
-    if (managerFilter) {
-      document.getElementById('genManagerFilter').value = managerFilter;
-    }
+    // Заполняем список менеджеров
+    populateManagerFilter();
 
   } catch (error) {
     console.error('Ошибка загрузки данных гендира:', error);
@@ -282,7 +273,7 @@ async function loadGenData() {
   }
 }
 
-// ✅ Функция расчета теоретической маржи по формуле
+// ✅ Функция расчета теоретической маржи
 function calculateTheoreticalMargin(dealType, amount) {
   if (!dealType || !amount || amount <= 0) return 0;
   
@@ -308,84 +299,55 @@ function showLoadingState() {
   document.getElementById('totalDeals').textContent = '...';
 }
 
-// Обновление KPI блоков
+// Обновление KPI блоков — только 4 основных
 function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
-  // Основные KPI (фактические значения)
+  // Основные KPI
   document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
   document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
   document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
   document.getElementById('totalDeals').textContent = deals;
   
-  // Создаем или обновляем дополнительные KPI блоки
-  let kpiContainer = document.querySelector('.kpi-container');
-  if (!kpiContainer) {
-    kpiContainer = document.createElement('div');
-    kpiContainer.className = 'kpi-container';
-    kpiContainer.style.cssText = `
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      margin: 20px 0;
+  // Дополнительные KPI — в одном блоке
+  const kpiContainer = document.querySelector('.kpi-container');
+  if (kpiContainer) {
+    kpiContainer.innerHTML = `
+      <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
+        <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
+        <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
+          ${formatCurrency(theoreticalMargin)}
+        </p>
+        <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
+      </div>
+      <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
+        <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
+        <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
+          ${formatCurrency(avgDeal)}
+        </p>
+        <small style="color:#52c41a;">на сделку</small>
+      </div>
+      <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
+        <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
+        <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
+          ${formatCurrency(expenses)}
+        </p>
+        <small style="color:#ff4d4f;">всего</small>
+      </div>
     `;
-    
-    const existingKPIs = document.querySelector('#genScreen .card > div:first-child');
-    if (existingKPIs) {
-      existingKPIs.parentNode.insertBefore(kpiContainer, existingKPIs.nextSibling);
-    }
   }
-  
-  // Дополнительные KPI
-  kpiContainer.innerHTML = `
-    <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
-      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
-        ${formatCurrency(theoreticalMargin)}
-      </p>
-      <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
-    </div>
-    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
-      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
-        ${formatCurrency(avgDeal)}
-      </p>
-      <small style="color:#52c41a;">на сделку</small>
-    </div>
-    <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
-      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
-        ${formatCurrency(expenses)}
-      </p>
-      <small style="color:#ff4d4f;">всего</small>
-    </div>
-    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffe58f;">
-      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:16px;">📈 Рентабельность</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#faad14;">
-        ${actualMarginPercent.toFixed(1)}%
-      </p>
-      <small style="color:#faad14;">фактическая</small>
-    </div>
-  `;
 }
 
-// Рендер графиков — ИСПРАВЛЕНО: убран дублирующийся заголовок
-function renderCharts(weeklyData, segmentData) {
-  const ctx1 = document.getElementById('revenueChart').getContext('2d');
+// Рендер графика — только один график
+function renderChart(weeklyData) {
+  const ctx = document.getElementById('revenueChart').getContext('2d');
   
   if (revenueChart) revenueChart.destroy();
-  if (segmentChart) segmentChart.destroy();
 
-  // ✅ График 1: Динамика по неделям - ФИКСИРОВАННЫЙ РАЗМЕР
   const labels = Object.keys(weeklyData).sort();
   const revenueData = labels.map(w => weeklyData[w].revenue);
   const theoreticalMarginData = labels.map(w => weeklyData[w].theoreticalMargin);
   const actualMarginData = labels.map(w => weeklyData[w].actualMargin);
 
-  // Убираем старый заголовок перед графиком
-  const chart1Container = document.getElementById('revenueChart').parentNode;
-  chart1Container.style.height = '300px';
-  chart1Container.querySelector('h3')?.remove(); // ← УДАЛЯЕМ ДУБЛИРУЮЩИЙСЯ ЗАГОЛОВОК
-  
-  revenueChart = new Chart(ctx1, {
+  revenueChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: labels.map(w => w.replace('-W', ' нед. ')),
@@ -422,7 +384,6 @@ function renderCharts(weeklyData, segmentData) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: 'top',
@@ -462,71 +423,9 @@ function renderCharts(weeklyData, segmentData) {
       }
     }
   });
-
-  // ✅ График 2: Распределение по сегментам - МАЛЕНЬКИЙ
-  let segmentCanvas = document.getElementById('segmentChart');
-  if (!segmentCanvas) {
-    const chartContainer = document.querySelector('#revenueChart').parentNode.parentNode;
-    
-    // Создаем контейнер для второго графика БЕЗ заголовка "Динамика по неделям"
-    const segmentContainer = document.createElement('div');
-    segmentContainer.style.cssText = `
-      margin-top: 20px;
-      width: 100%;
-      height: 200px;
-      position: relative;
-    `;
-    
-    // ✅ Правильный заголовок
-    segmentContainer.innerHTML = '<h3 style="margin-bottom:10px; font-size:14px;">Распределение по сегментам</h3>';
-    
-    segmentCanvas = document.createElement('canvas');
-    segmentCanvas.id = 'segmentChart';
-    segmentContainer.appendChild(segmentCanvas);
-    chartContainer.appendChild(segmentContainer);
-  }
-  
-  const segmentLabels = Object.keys(segmentData);
-  if (segmentLabels.length > 0) {
-    const segmentRevenue = segmentLabels.map(s => segmentData[s].revenue);
-    
-    segmentChart = new Chart(segmentCanvas.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: segmentLabels.map(s => getSegmentLabel(s)),
-        datasets: [{
-          data: segmentRevenue,
-          backgroundColor: [
-            '#1890ff', '#52c41a', '#faad14', '#eb2f96',
-            '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'right',
-            labels: {
-              boxWidth: 10,
-              font: {
-                size: 9
-              },
-              padding: 8
-            }
-          }
-        },
-        cutout: '60%'
-      }
-    });
-  } else {
-    segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
-  }
 }
 
-// Показать аналитику
+// Показать аналитику — только топ-10 сделок и топ-5 менеджеров
 function showAnalytics(topDeals, topManagers, segmentData) {
   let analyticsDiv = document.getElementById('analytics');
   if (!analyticsDiv) {
@@ -608,7 +507,7 @@ function showAnalytics(topDeals, topManagers, segmentData) {
 // Заполняем список ВСЕХ менеджеров
 async function populateManagerFilter() {
   try {
-    // Загружаем ВСЕХ менеджеров (ограничиваем последними 1000 сделок для скорости)
+    // Загружаем ВСЕХ менеджеров
     const { data: allManagers, error } = await genSupabaseClient
       .from('deals')
       .select('manager_name')
@@ -697,14 +596,6 @@ function formatCurrency(amount, short = false) {
   return Math.round(amount).toLocaleString('ru-RU') + ' ₽';
 }
 
-function getSegmentLabel(segment) {
-  const labels = {
-    'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
-    'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
-  };
-  return labels[segment] || segment;
-}
-
 // Переход к панели финансиста
 function goToFinPanel() {
   console.log('Переход к финансовому контролю...');
@@ -791,6 +682,15 @@ async function exportToExcel() {
     console.error('Ошибка экспорта:', error);
     alert('Ошибка экспорта: ' + error.message);
   }
+}
+
+// Вспомогательная функция для сегментов
+function getSegmentLabel(segment) {
+  const labels = {
+    'to': 'ТО', 'pto': 'ПТО', 'eq': 'Оборудование',
+    'comp': 'Комплектующие', 'rep': 'Ремонты', 'rent': 'Аренда'
+  };
+  return labels[segment] || segment;
 }
 
 // Экспорт функции
