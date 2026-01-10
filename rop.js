@@ -278,6 +278,24 @@ async function showRopCreateForm() {
   const crmId = prompt('Введите номер сделки из CRM:');
   if (!crmId) return;
 
+  // 🔍 Проверка на дубликат ДО показа формы
+  try {
+    const {  existingDeal } = await ropSupabaseClient
+      .from('deals')
+      .select('crm_id')
+      .eq('crm_id', crmId)
+      .maybeSingle();
+
+    if (existingDeal) {
+      alert('Сделка с таким CRM ID уже существует!');
+      return;
+    }
+  } catch (error) {
+    console.error('Ошибка проверки дубликата:', error);
+    alert('Не удалось проверить CRM ID. Попробуйте позже.');
+    return;
+  }
+
   // Скрыть панель РОПа, показать форму
   document.getElementById('ropScreen').style.display = 'none';
   document.getElementById('createDealForm').style.display = 'block';
@@ -425,42 +443,44 @@ async function showRopCreateForm() {
         bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, false);
       }
 
-      const { error } = await ropSupabaseClient
-        .from('deals')
-        .insert([{
-          crm_id: crmId,
-          manager_name: managerName,
-          deal_type: dealType,
-          contract_amount: contractAmount,
-          total_paid: paymentAmount,
-          paid: isFullyPaid,
-          up_signed: upSigned,
-          is_first: isFirst,
-          arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
-          margin: margin,
-          bonus_paid: bonusPaid,
-          created_by: ropCurrentUserName,
-          created_at: new Date().toISOString()
-        }]);
+      try {
+        const { error } = await ropSupabaseClient
+          .from('deals')
+          .insert([{
+            crm_id: crmId,
+            manager_name: managerName,
+            deal_type: dealType,
+            contract_amount: contractAmount,
+            total_paid: paymentAmount,
+            paid: isFullyPaid,
+            up_signed: upSigned,
+            is_first: isFirst,
+            arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
+            margin: margin,
+            bonus_paid: bonusPaid,
+            created_by: ropCurrentUserName,
+            created_at: new Date().toISOString()
+          }]);
 
-      if (error) {
+        if (error) throw error;
+
+        document.getElementById('ropCreateFormResult').innerHTML = 
+          `<div style="background: #efe; color: #090; padding: 10px; border-radius: 4px;">
+            ✅ Сделка создана успешно!
+          </div>`;
+        
+        setTimeout(() => {
+          document.getElementById('createDealForm').style.display = 'none';
+          document.getElementById('ropScreen').style.display = 'block';
+          loadRopData(); // обновить данные
+        }, 2000);
+      } catch (err) {
+        console.error('Ошибка при создании сделки:', err);
         document.getElementById('ropCreateFormResult').innerHTML = 
           `<div style="background: #fee; color: #c00; padding: 10px; border-radius: 4px;">
-            ❌ Ошибка: ${error.message}
+            ❌ Ошибка: ${err.message || 'Неизвестная ошибка'}
           </div>`;
-        return;
       }
-
-      document.getElementById('ropCreateFormResult').innerHTML = 
-        `<div style="background: #efe; color: #090; padding: 10px; border-radius: 4px;">
-          ✅ Сделка создана успешно!
-        </div>`;
-      
-      setTimeout(() => {
-        document.getElementById('createDealForm').style.display = 'none';
-        document.getElementById('ropScreen').style.display = 'block';
-        loadRopData(); // обновить данные
-      }, 2000);
     });
   } catch (error) {
     console.error('Ошибка при создании формы:', error);
