@@ -43,7 +43,7 @@ function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
   loadGenData(); // загрузить при старте
 }
 
-// Добавление фильтров
+// Добавление фильтров — ИСПРАВЛЕНО: кнопка "Сбросить фильтры" читаемая
 function addFilters() {
   const filterContainer = document.createElement('div');
   filterContainer.style.cssText = `
@@ -78,11 +78,23 @@ function addFilters() {
       </select>
     </div>
     <div>
-      <button id="resetFilters" style="padding:8px 16px; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer;">
+      <!-- ✅ ИСПРАВЛЕНО: кнопка читаемая -->
+      <button id="resetFilters" class="btn-secondary" style="padding:8px 16px; height:38px;">
         Сбросить фильтры
       </button>
     </div>
   `;
+  
+  const loadButton = document.getElementById('loadGenData');
+  loadButton.parentNode.insertBefore(filterContainer, loadButton);
+  
+  // Обработчик сброса фильтров
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    document.getElementById('genSegmentFilter').value = '';
+    document.getElementById('genManagerFilter').value = '';
+    loadGenData();
+  });
+}
   
   const loadButton = document.getElementById('loadGenData');
   loadButton.parentNode.insertBefore(filterContainer, loadButton);
@@ -421,45 +433,25 @@ function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgD
   ));
 }
 
-// Рендер графиков - ИСПРАВЛЕННАЯ ВЕРСИЯ (без наползания)
+// Рендер графиков — ИСПРАВЛЕНО: убран дублирующийся заголовок
 function renderCharts(weeklyData, segmentData) {
   const ctx1 = document.getElementById('revenueChart').getContext('2d');
   
-  // Уничтожаем старые графики
   if (revenueChart) revenueChart.destroy();
   if (segmentChart) segmentChart.destroy();
-  
-  // Создаем контейнер для графиков
-  const chartsContainer = document.querySelector('#revenueChart').parentNode;
-  chartsContainer.innerHTML = `
-    <div style="margin-bottom: 30px;">
-      <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Динамика по неделям</h3>
-      <div style="position: relative; height: 350px;">
-        <canvas id="revenueChart"></canvas>
-      </div>
-    </div>
-    <div>
-      <h3 style="margin-bottom: 15px; font-size: 16px; color: #333;">Распределение по сегментам</h3>
-      <div style="position: relative; height: 300px; display: flex;">
-        <div style="flex: 1; max-width: 60%;">
-          <canvas id="segmentChart"></canvas>
-        </div>
-        <div style="flex: 1; padding-left: 20px;">
-          <div id="segmentLegend" style="max-height: 250px; overflow-y: auto;"></div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const newCtx1 = document.getElementById('revenueChart').getContext('2d');
-  
-  // ✅ График 1: Динамика по неделям
+
+  // ✅ График 1: Динамика по неделям - ФИКСИРОВАННЫЙ РАЗМЕР
   const labels = Object.keys(weeklyData).sort();
   const revenueData = labels.map(w => weeklyData[w].revenue);
   const theoreticalMarginData = labels.map(w => weeklyData[w].theoreticalMargin);
   const actualMarginData = labels.map(w => weeklyData[w].actualMargin);
 
-  revenueChart = new Chart(newCtx1, {
+  // Убираем старый заголовок перед графиком
+  const chart1Container = document.getElementById('revenueChart').parentNode;
+  chart1Container.style.height = '300px';
+  chart1Container.querySelector('h3')?.remove(); // ← УДАЛЯЕМ ДУБЛИРУЮЩИЙСЯ ЗАГОЛОВОК
+  
+  revenueChart = new Chart(ctx1, {
     type: 'line',
     data: {
       labels: labels.map(w => w.replace('-W', ' нед. ')),
@@ -502,7 +494,7 @@ function renderCharts(weeklyData, segmentData) {
           position: 'top',
           labels: {
             font: {
-              size: 12
+              size: 11
             }
           }
         },
@@ -522,14 +514,14 @@ function renderCharts(weeklyData, segmentData) {
               return formatCurrency(value, true);
             },
             font: {
-              size: 11
+              size: 10
             }
           }
         },
         x: {
           ticks: {
             font: {
-              size: 11
+              size: 10
             }
           }
         }
@@ -537,24 +529,43 @@ function renderCharts(weeklyData, segmentData) {
     }
   });
 
-  // ✅ График 2: Распределение по сегментам с легендой справа
+  // ✅ График 2: Распределение по сегментам - МАЛЕНЬКИЙ
+  let segmentCanvas = document.getElementById('segmentChart');
+  if (!segmentCanvas) {
+    const chartContainer = document.querySelector('#revenueChart').parentNode.parentNode;
+    
+    // Создаем контейнер для второго графика БЕЗ заголовка "Динамика по неделям"
+    const segmentContainer = document.createElement('div');
+    segmentContainer.style.cssText = `
+      margin-top: 20px;
+      width: 100%;
+      height: 200px;
+      position: relative;
+    `;
+    
+    // ✅ Правильный заголовок
+    segmentContainer.innerHTML = '<h3 style="margin-bottom:10px; font-size:14px;">Распределение по сегментам</h3>';
+    
+    segmentCanvas = document.createElement('canvas');
+    segmentCanvas.id = 'segmentChart';
+    segmentContainer.appendChild(segmentCanvas);
+    chartContainer.appendChild(segmentContainer);
+  }
+  
   const segmentLabels = Object.keys(segmentData);
   if (segmentLabels.length > 0) {
     const segmentRevenue = segmentLabels.map(s => segmentData[s].revenue);
-    const segmentColors = [
-      '#1890ff', '#52c41a', '#faad14', '#eb2f96',
-      '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
-    ];
     
-    const segmentCtx = document.getElementById('segmentChart').getContext('2d');
-    
-    segmentChart = new Chart(segmentCtx, {
+    segmentChart = new Chart(segmentCanvas.getContext('2d'), {
       type: 'doughnut',
       data: {
         labels: segmentLabels.map(s => getSegmentLabel(s)),
         datasets: [{
           data: segmentRevenue,
-          backgroundColor: segmentColors.slice(0, segmentLabels.length),
+          backgroundColor: [
+            '#1890ff', '#52c41a', '#faad14', '#eb2f96',
+            '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
+          ],
           borderWidth: 1
         }]
       },
@@ -563,22 +574,24 @@ function renderCharts(weeklyData, segmentData) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            display: false // Скрываем стандартную легенду
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const value = context.raw;
-                const total = segmentRevenue.reduce((a, b) => a + b, 0);
-                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
-              }
+            position: 'right',
+            labels: {
+              boxWidth: 10,
+              font: {
+                size: 9
+              },
+              padding: 8
             }
           }
         },
-        cutout: '50%'
+        cutout: '60%'
       }
     });
+  } else {
+    segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
+  }
+}
+
     
     // Создаем кастомную легенду
     const legendContainer = document.getElementById('segmentLegend');
