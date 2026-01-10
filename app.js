@@ -1,6 +1,8 @@
+// app.js — общий каркас приложения
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('app.js: DOM загружен, инициализация менеджера...');
-  
+  console.log('app.js: инициализация...');
+
+  // 🔑 Supabase (без пробелов!)
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -9,833 +11,161 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUserName = null;
   let currentUserRole = null;
 
-  // 💡 Управление историей браузера
+  // 💾 Кэширование данных (5 минут)
+  const cache = {
+    deals: null,
+    dealsTimestamp: 0,
+    users: null,
+    usersTimestamp: 0,
+    TTL: 5 * 60 * 1000 // 5 минут
+  };
+
+  // 📦 Утилита кэширования
+  window.cachedSupabaseQuery = async (key, queryFn) => {
+    const now = Date.now();
+    if (cache[key] && now - cache[`${key}Timestamp`] < cache.TTL) {
+      console.log(`Кэш использован для: ${key}`);
+      return cache[key];
+    }
+    const result = await queryFn();
+    cache[key] = result;
+    cache[`${key}Timestamp`] = now;
+    return result;
+  };
+
+  // 💡 Управление URL
   function updateUrl(screenName) {
     const newUrl = `${window.location.origin}/#${screenName}`;
     window.history.pushState({ screen: screenName }, '', newUrl);
   }
 
-  // 🔧 Функция показа экрана с проверкой элементов
+  // 🖥️ Показ экрана
   function showScreen(screenName) {
-    console.log('showScreen вызывается для:', screenName);
-    
-    // Скрываем все экраны
     const screens = ['loginScreen', 'crmScreen', 'mainApp', 'ropScreen', 'finScreen', 'genScreen'];
-    screens.forEach(screenId => {
-      const element = document.getElementById(screenId);
-      if (element) {
-        element.style.display = 'none';
-      }
+    screens.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
     });
-    
-    // Показываем нужный экран
-    if (screenName === 'login') {
-      const loginScreen = document.getElementById('loginScreen');
-      if (loginScreen) loginScreen.style.display = 'block';
-    } else if (screenName === 'crm') {
-      const crmScreen = document.getElementById('crmScreen');
-      if (crmScreen) crmScreen.style.display = 'block';
-    } else if (screenName === 'form') {
-      const mainApp = document.getElementById('mainApp');
-      if (mainApp) mainApp.style.display = 'block';
-    } else if (screenName === 'rop') {
-      const ropScreen = document.getElementById('ropScreen');
-      if (ropScreen) ropScreen.style.display = 'block';
-    } else if (screenName === 'fin') {
-      const finScreen = document.getElementById('finScreen');
-      if (finScreen) finScreen.style.display = 'block';
-    } else if (screenName === 'gen') {
-      const genScreen = document.getElementById('genScreen');
-      if (genScreen) genScreen.style.display = 'block';
-    }
+
+    const target = document.getElementById(screenName === 'form' ? 'mainApp' : screenName + 'Screen');
+    if (target) target.style.display = 'block';
   }
 
-  // 🏆 Турнирная таблица (только менеджеры)
-  async function loadDepartmentRanking(currentMonth) {
+  // 👤 Авторизация
+  document.getElementById('loginBtn')?.addEventListener('click', async () => {
+    const phone = document.getElementById('loginPhone')?.value.trim();
+    if (!phone) { alert('Введите номер телефона'); return; }
+
+    const passwordField = document.getElementById('passwordField');
+    if (passwordField.style.display !== 'block') {
+      passwordField.style.display = 'block';
+      document.getElementById('loginPassword').focus();
+      document.getElementById('loginBtn').textContent = 'Войти';
+      return;
+    }
+
+    const password = document.getElementById('loginPassword')?.value.trim();
+    if (!password) { alert('Введите пароль'); return; }
+
     try {
-      const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-      const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
-
-      const { data: deals, error: dealsError } = await supabaseClient
-        .from('deals')
-        .select('manager_name, margin')
-        .gte('created_at', startOfMonth.toISOString())
-        .lte('created_at', endOfMonth.toISOString());
-
-      if (dealsError || !deals) return [];
-
-      const managerNames = [...new Set(deals.map(d => d.manager_name))];
-      const { data: users, error: usersError } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from('allowed_users')
-        .select('name, role')
-        .in('name', managerNames);
+        .select('phone, name, role, password')
+        .eq('phone', phone)
+        .single();
 
-      if (usersError) return [];
-
-      const managerNamesOnly = new Set(
-        users.filter(u => u.role === 'manager').map(u => u.name)
-      );
-
-      const managerStats = {};
-      deals.forEach(deal => {
-        if (managerNamesOnly.has(deal.manager_name)) {
-          if (!managerStats[deal.manager_name]) {
-            managerStats[deal.manager_name] = { margin: 0, name: deal.manager_name };
-          }
-          managerStats[deal.manager_name].margin += deal.margin || 0;
-        }
-      });
-
-      return Object.values(managerStats)
-        .sort((a, b) => b.margin - a.margin)
-        .map((m, i) => ({ ...m, rank: i + 1 }));
-    } catch (error) {
-      console.error('Ошибка загрузки рейтинга:', error);
-      return [];
-    }
-  }
-
-  // 📊 Расчёт премии
-  function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
-    if (!paid || !upSigned) return 0;
-    
-    if (dealType === 'to') {
-      if (annualContract && revenue >= 35000) return Math.round(revenue * 12 * 0.03);
-      if (isFirst) {
-        if (revenue >= 70000) return 6000;
-        if (revenue >= 35000) return 3000;
-        return 500;
-      } else {
-        if (revenue >= 70000) return 2000;
-        if (revenue >= 35000) return 1000;
-        return 200;
-      }
-    }
-    
-    if (dealType === 'pto') {
-      if (revenue >= 360000) return 6000;
-      if (revenue >= 90000) return 3000;
-      return 1000;
-    }
-    
-    if (dealType === 'comp' || dealType === 'rep') {
-      if (revenue >= 300000) return Math.round(revenue * 0.01);
-      return Math.round(revenue * 0.03);
-    }
-    
-    if (dealType === 'eq') return Math.round(revenue * 0.01);
-    if (dealType === 'rent') return 1500;
-    
-    return 0;
-  }
-
-  // 👤 Авторизация пользователя
-  const loginBtn = document.getElementById('loginBtn');
-  if (loginBtn) {
-    loginBtn.addEventListener('click', async () => {
-      console.log('Кнопка входа нажата');
-      
-      const phoneInput = document.getElementById('loginPhone');
-      const phone = phoneInput ? phoneInput.value.trim() : '';
-      if (!phone) { 
-        alert('Введите номер телефона'); 
-        return; 
-      }
-
-      const passwordField = document.getElementById('passwordField');
-      if (passwordField && passwordField.style.display !== 'block') {
-        passwordField.style.display = 'block';
-        const passwordInput = document.getElementById('loginPassword');
-        if (passwordInput) passwordInput.focus();
-        loginBtn.textContent = 'Войти';
+      if (error || !data || password !== data.password) {
+        document.getElementById('loginError').textContent = 'Неверный логин или пароль';
+        document.getElementById('loginError').style.display = 'block';
         return;
       }
 
-      const passwordInput = document.getElementById('loginPassword');
-      const password = passwordInput ? passwordInput.value.trim() : '';
-      if (!password) { 
-        alert('Введите пароль'); 
-        return; 
-      }
+      // Сохраняем данные пользователя
+      currentUserPhone = phone;
+      currentUserName = data.name;
+      currentUserRole = data.role;
 
-      try {
-        const { data, error } = await supabaseClient
-          .from('allowed_users')
-          .select('phone, name, role, password')
-          .eq('phone', phone)
-          .single();
+      // Скрываем логин
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('loginError').style.display = 'none';
 
-        if (error || !data) {
-          const loginError = document.getElementById('loginError');
-          if (loginError) {
-            loginError.textContent = 'Номер не найден.';
-            loginError.style.display = 'block';
-          }
-          return;
-        }
-
-        if (password !== data.password) {
-          if (passwordInput) passwordInput.value = '';
-          const loginError = document.getElementById('loginError');
-          if (loginError) {
-            loginError.textContent = 'Неверный пароль.';
-            loginError.style.display = 'block';
-          }
-          return;
-        }
-
-        currentUserPhone = phone;
-        currentUserName = data.name;
-        currentUserRole = data.role;
-
-        // Скрываем экран входа
-        const loginScreen = document.getElementById('loginScreen');
-        if (loginScreen) loginScreen.style.display = 'none';
-        
-        const loginError = document.getElementById('loginError');
-        if (loginError) loginError.style.display = 'none';
-        
-        console.log('Пользователь авторизован:', {
-          name: data.name,
-          role: data.role,
-          phone: phone
-        });
-
-        // 🔑 Роутинг по ролям
-        if (data.role === 'rop') {
-          console.log('Переход на экран РОПа');
-          showScreen('rop');
-          updateUrl('rop');
-          
-          if (typeof initRopPanel === 'function') {
-            try {
-              initRopPanel(supabaseClient, currentUserPhone, currentUserName);
-              console.log('Модуль РОПа инициализирован');
-            } catch (error) {
-              console.error('Ошибка инициализации РОПа:', error);
-            }
-          }
-        } 
-        else if (data.role === 'fin') {
-          console.log('Переход на экран финансиста');
-          showScreen('fin');
-          updateUrl('fin');
-          
-          if (typeof initFinPanel === 'function') {
-            try {
-              initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-              console.log('Модуль финансиста инициализирован');
-            } catch (error) {
-              console.error('Ошибка инициализации финансиста:', error);
-            }
-          }
-        }
-        else if (data.role === 'gen') {
-          console.log('Переход на экран гендиректора');
-          showScreen('gen');
-          updateUrl('gen');
-          
-          if (typeof initGenPanel === 'function') {
-            try {
-              initGenPanel(supabaseClient, currentUserPhone, currentUserName);
-              console.log('Модуль гендиректора инициализирован');
-            } catch (error) {
-              console.error('Ошибка инициализации гендиректора:', error);
-            }
-          }
-        }
-        else {
-          // Обычный менеджер
-          console.log('Переход на экран CRM для менеджера');
-          showScreen('crm');
-          updateUrl('crm');
-        }
-
-      } catch (error) {
-        console.error('Ошибка авторизации:', error);
-        alert('Ошибка подключения к серверу. Попробуйте позже.');
-      }
-    });
-  }
-
-  // 🔍 Проверка CRM ID для создания/обновления сделки
-  const checkCrmBtn = document.getElementById('checkCrmBtn');
-  if (checkCrmBtn) {
-    checkCrmBtn.addEventListener('click', async () => {
-      const crmIdInput = document.getElementById('inputCrmId');
-      const crmId = crmIdInput ? crmIdInput.value.trim() : '';
-      if (!crmId) {
-        const crmError = document.getElementById('crmError');
-        if (crmError) {
-          crmError.textContent = 'Введите номер сделки';
-          crmError.style.display = 'block';
-        }
-        return;
-      }
-
-      try {
-        const { data, error } = await supabaseClient
-          .from('deals')
-          .select('*')
-          .eq('crm_id', crmId)
-          .maybeSingle();
-
-        if (error) {
-          const crmError = document.getElementById('crmError');
-          if (crmError) {
-            crmError.textContent = 'Ошибка: ' + error.message;
-            crmError.style.display = 'block';
-          }
-          return;
-        }
-
-        if (!data) {
-          showCreateForm(crmId);
-        } else {
-          showUpdateForm(data);
-        }
-      } catch (error) {
-        console.error('Ошибка проверки CRM ID:', error);
-        alert('Ошибка при проверке сделки');
-      }
-    });
-  }
-
-  // 📅 Расчёт премии за месяц
-  const checkMonthBtn = document.getElementById('checkMonthBtn');
-  if (checkMonthBtn) {
-    checkMonthBtn.addEventListener('click', async () => {
-      if (!currentUserPhone) {
-        alert('Сначала войдите в систему');
-        return;
-      }
-
-      try {
-        const { data: userData, error: userError } = await supabaseClient
-          .from('allowed_users')
-          .select('name')
-          .eq('phone', currentUserPhone)
-          .single();
-
-        if (userError || !userData || !userData.name) {
-          alert('Ошибка авторизации.');
-          return;
-        }
-
-        const managerName = userData.name;
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-        const dealsResponse = await supabaseClient
-          .from('deals')
-          .select('crm_id, deal_type, contract_amount, total_paid, paid, up_signed, bonus_paid, created_at')
-          .eq('manager_name', managerName)
-          .gte('created_at', startOfMonth.toISOString())
-          .lte('created_at', endOfMonth.toISOString());
-
-        if (dealsResponse.error) {
-          alert('Ошибка загрузки сделок: ' + dealsResponse.error.message);
-          return;
-        }
-
-        const deals = Array.isArray(dealsResponse.data) ? dealsResponse.data : [];
-        const resultDiv = document.getElementById('monthResult');
-
-        let totalMargin = 0;
-        let totalBonus = 0;
-
-        const dealRows = deals.map(deal => {
-          const margin = 
-            deal.deal_type === 'to' || deal.deal_type === 'pto' || deal.deal_type === 'rent' ? deal.contract_amount * 0.7 :
-            deal.deal_type === 'eq' ? deal.contract_amount * 0.2 :
-            deal.deal_type === 'comp' ? deal.contract_amount * 0.3 :
-            deal.deal_type === 'rep' ? deal.contract_amount * 0.4 : 0;
-
-          totalMargin += margin;
-          totalBonus += deal.bonus_paid || 0;
-
-          const status = deal.paid ? '✅ 100%' : `⏳ ${Math.round((deal.total_paid / deal.contract_amount) * 100)}%`;
-
-          return `
-            <tr>
-              <td>${deal.crm_id}</td>
-              <td>${
-                deal.deal_type === 'to' ? 'ТО' :
-                deal.deal_type === 'pto' ? 'ПТО' :
-                deal.deal_type === 'eq' ? 'Оборудование' :
-                deal.deal_type === 'comp' ? 'Комплектующие' :
-                deal.deal_type === 'rep' ? 'Ремонты' :
-                deal.deal_type === 'rent' ? 'Аренда' : deal.deal_type
-              }</td>
-              <td>${deal.contract_amount.toLocaleString('ru-RU')} ₽</td>
-              <td>${status}</td>
-              <td>${(deal.bonus_paid || 0).toLocaleString('ru-RU')} ₽</td>
-            </tr>
-          `;
-        }).join('');
-
-        const basePlan = 800000;
-        const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
-        const plan = basePlan * coefficients[now.getMonth()];
-        const planPercent = (totalMargin / plan) * 100;
-
-        let finalPayout = 0;
-        if (planPercent >= 100) {
-          finalPayout = totalBonus;
-        } else if (planPercent >= 50) {
-          finalPayout = Math.round(totalBonus * 0.5);
-        }
-
-        if (resultDiv) {
-          if (deals.length === 0) {
-            resultDiv.innerHTML = `
-              <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-              <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-                <strong>Нет данных.</strong><br>
-                Сделок не найдено.
-              </div>
-            `;
-          } else {
-            resultDiv.innerHTML = `
-              <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-              <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
-                <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
-                <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
-                <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
-                <strong>К выплате:</strong> ${finalPayout.toLocaleString('ru-RU')} ₽
-              </div>
-              <div style="margin-top:12px;">
-                <strong>Выполнение плана:</strong>
-                <div style="background:#e6f7ff; height:10px; border-radius:5px; margin-top:4px; overflow:hidden;">
-                  <div style="height:100%; background:#52c41a; width:${Math.min(100, planPercent)}%; border-radius:5px;"></div>
-                </div>
-                <small>${planPercent.toFixed(1)}%</small>
-              </div>
-              <h4>Сделки (${deals.length} шт):</h4>
-              <table style="width:100%; font-size:14px;">
-                <thead>
-                  <tr>
-                    <th>CRM ID</th>
-                    <th>Тип</th>
-                    <th>Договор</th>
-                    <th>Оплата</th>
-                    <th>Премия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${dealRows}
-                </tbody>
-              </table>
-            `;
-
-            // Турнирная таблица
-            const ranking = await loadDepartmentRanking(now);
-            if (ranking.length > 1) {
-              let rankingHtml = `
-                <h4 style="margin-top:25px;">🏆 Рейтинг отдела (${ranking.length} менеджеров)</h4>
-                <table style="width:100%; font-size:14px; margin-top:10px;">
-                  <thead>
-                    <tr>
-                      <th>Место</th>
-                      <th>Менеджер</th>
-                      <th>Маржа</th>
-                      <th>% от плана</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-              `;
-
-              const monthPlan = basePlan * coefficients[now.getMonth()];
-              ranking.forEach(manager => {
-                const planPct = Math.round((manager.margin / monthPlan) * 100);
-                const isCurrentUser = manager.name === currentUserName;
-                rankingHtml += `
-                  <tr style="${isCurrentUser ? 'background:#fffbe6;' : ''}">
-                    <td><strong>${manager.rank}</strong></td>
-                    <td>${manager.name}</td>
-                    <td>${manager.margin.toLocaleString('ru-RU')} ₽</td>
-                    <td>${planPct}%</td>
-                  </tr>
-                `;
-              });
-
-              rankingHtml += `</tbody></table>`;
-              resultDiv.innerHTML += rankingHtml;
-            }
-          }
-          resultDiv.style.display = 'block';
-        }
-
-      } catch (error) {
-        console.error('Ошибка расчёта премии:', error);
-        alert('Ошибка при расчёте премии');
-      }
-    });
-  }
-
-  // ✉️ Обратная связь
-  const feedbackBtn = document.getElementById('feedbackBtn');
-  if (feedbackBtn) {
-    feedbackBtn.addEventListener('click', () => {
-      const form = document.getElementById('feedbackForm');
-      if (form) {
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-      }
-    });
-  }
-
-  const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
-  if (sendFeedbackBtn) {
-    sendFeedbackBtn.addEventListener('click', async () => {
-      const messageInput = document.getElementById('feedbackText');
-      const message = messageInput ? messageInput.value.trim() : '';
-      if (!message || !currentUserPhone) {
-        alert('Пожалуйста, введите сообщение');
-        return;
-      }
-      
-      try {
-        const { error } = await supabaseClient
-          .from('feedback')
-          .insert([{ 
-            phone: currentUserPhone, 
-            message, 
-            created_at: new Date().toISOString() 
-          }]);
-          
-        if (error) {
-          alert('Не удалось отправить сообщение. Попробуйте позже.');
-        } else {
-          const feedbackResult = document.getElementById('feedbackResult');
-          if (feedbackResult) {
-            feedbackResult.textContent = '✅ Спасибо! Ваше сообщение отправлено.';
-          }
-          if (messageInput) messageInput.value = '';
-          setTimeout(() => {
-            const feedbackForm = document.getElementById('feedbackForm');
-            if (feedbackForm) feedbackForm.style.display = 'none';
-            if (feedbackResult) feedbackResult.textContent = '';
-          }, 2000);
-        }
-      } catch (error) {
-        console.error('Ошибка отправки обратной связи:', error);
-      }
-    });
-  }
-
-  // ➕ Форма создания сделки (ИСПРАВЛЕНА - добавлена проверка formContainer)
-  function showCreateForm(crmId) {
-    showScreen('form');
-    updateUrl('form');
-    
-    const formContainer = document.getElementById('formContainer');
-    if (!formContainer) {
-      console.error('Элемент #formContainer не найден');
-      alert('Ошибка: элемент формы не найден. Обновите страницу.');
-      return;
-    }
-    
-    formContainer.innerHTML = `
-      <button id="backBtn">← Назад к CRM ID</button>
-      <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
-      <label>Ваше имя (автоматически):</label>
-      <input type="text" id="manager_name" value="${currentUserName || ''}" readonly>
-      <label>Сумма договора (₽):</label>
-      <input type="number" id="contract_amount" placeholder="700000" required>
-      <label>Сумма предоплаты (₽):</label>
-      <input type="number" id="payment_amount" placeholder="140000" required>
-      <label>Тип сделки:</label>
-      <select id="deal_type">
-        <option value="to">ТО</option>
-        <option value="pto">ПТО</option>
-        <option value="comp">Комплектующие</option>
-        <option value="rep">Ремонты</option>
-        <option value="eq">Оборудование</option>
-        <option value="rent">Аренда</option>
-      </select>
-      <div id="arpuSection" style="display:none;">
-        <label>ARPU (₽/мес):</label>
-        <input type="number" id="arpu" placeholder="46666">
-      </div>
-      <div id="annualSection" style="display:none; margin-top:10px;">
-        <input type="checkbox" id="annual_contract">
-        <label for="annual_contract">Годовой контракт</label>
-      </div>
-      <div style="margin-top:15px;">
-        <input type="checkbox" id="is_first"> 
-        <label for="is_first">Первый платёж (ТО)?</label>
-      </div>
-      <div style="margin-top:10px;">
-        <input type="checkbox" id="paid"> 
-        <label for="paid">Оплачен?</label>
-      </div>
-      <div style="margin-top:10px;">
-        <input type="checkbox" id="up_signed"> 
-        <label for="up_signed">УПД подписан?</label>
-      </div>
-      <button id="createDealBtn" class="btn-success">Создать сделку</button>
-      <div id="createFormResult" class="result"></div>
-    `;
-
-    // Обработчик изменения типа сделки
-    const dealTypeSelect = document.getElementById('deal_type');
-    if (dealTypeSelect) {
-      dealTypeSelect.addEventListener('change', () => {
-        const isTO = dealTypeSelect.value === 'to';
-        const arpuSection = document.getElementById('arpuSection');
-        const annualSection = document.getElementById('annualSection');
-        if (arpuSection) arpuSection.style.display = isTO ? 'block' : 'none';
-        if (annualSection) annualSection.style.display = isTO ? 'block' : 'none';
-      });
-      dealTypeSelect.dispatchEvent(new Event('change'));
-    }
-
-    // Обработчик создания сделки
-    const createDealBtn = document.getElementById('createDealBtn');
-    if (createDealBtn) {
-      createDealBtn.addEventListener('click', async () => {
-        const managerNameInput = document.getElementById('manager_name');
-        const contractAmountInput = document.getElementById('contract_amount');
-        const paymentAmountInput = document.getElementById('payment_amount');
-        const dealTypeSelect = document.getElementById('deal_type');
-        const arpuInput = document.getElementById('arpu');
-        const annualContractCheckbox = document.getElementById('annual_contract');
-        const isFirstCheckbox = document.getElementById('is_first');
-        const paidCheckbox = document.getElementById('paid');
-        const upSignedCheckbox = document.getElementById('up_signed');
-
-        if (!managerNameInput || !contractAmountInput || !paymentAmountInput || !dealTypeSelect) {
-          alert('Ошибка: не все необходимые элементы формы найдены');
-          return;
-        }
-
-        const managerName = managerNameInput.value.trim();
-        const contractAmount = parseFloat(contractAmountInput.value);
-        const paymentAmount = parseFloat(paymentAmountInput.value);
-        const dealType = dealTypeSelect.value;
-        const arpuValue = arpuInput ? arpuInput.value : '';
-        const annualContract = annualContractCheckbox ? annualContractCheckbox.checked : false;
-        const isFirst = isFirstCheckbox ? isFirstCheckbox.checked : false;
-        const paid = paidCheckbox ? paidCheckbox.checked : false;
-        const upSigned = upSignedCheckbox ? upSignedCheckbox.checked : false;
-
-        if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-          alert('Заполните все обязательные поля');
-          return;
-        }
-
-        const totalPaid = paymentAmount;
-        const isFullyPaid = totalPaid >= contractAmount;
-        let bonusPaid = 0;
-
-        if (isFullyPaid) {
-          let revenueForBonus = contractAmount;
-          if (dealType === 'to') {
-            const arpu = arpuValue ? parseFloat(arpuValue) : contractAmount / 12;
-            revenueForBonus = arpu;
-          }
-          bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, annualContract);
-        }
-
-        const margin = 
-          dealType === 'to' || dealType === 'pto' || dealType === 'rent' ? contractAmount * 0.7 :
-          dealType === 'eq' ? contractAmount * 0.2 :
-          dealType === 'comp' ? contractAmount * 0.3 :
-          dealType === 'rep' ? contractAmount * 0.4 : 0;
-
-        try {
-          const { error } = await supabaseClient
-            .from('deals')
-            .insert([{
-              crm_id: crmId,
-              manager_name: managerName,
-              deal_type: dealType,
-              contract_amount: contractAmount,
-              total_paid: totalPaid,
-              paid: isFullyPaid,
-              up_signed: upSigned,
-              is_first: isFirst,
-              arpu_input: dealType === 'to' ? (arpuValue ? parseFloat(arpuValue) : null) : null,
-              annual_contract: annualContract,
-              margin: margin,
-              bonus_paid: bonusPaid,
-              created_at: new Date().toISOString()
-            }]);
-
-          if (error) {
-            alert('Ошибка создания сделки: ' + error.message);
-            return;
-          }
-
-          const createFormResult = document.getElementById('createFormResult');
-          if (createFormResult) {
-            createFormResult.innerHTML = `
-              ✅ Сделка создана успешно!<br>
-              • Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}<br>
-              • Маржа: ${margin.toLocaleString('ru-RU')} ₽
-            `;
-            createFormResult.style.display = 'block';
-          }
-          
-        } catch (error) {
-          console.error('Ошибка при создании сделки:', error);
-          alert('Ошибка при создании сделки. Попробуйте позже.');
-        }
-      });
-    }
-  }
-
-  // 🔄 Форма обновления сделки (ИСПРАВЛЕНА - добавлена проверка formContainer)
-  function showUpdateForm(deal) {
-    const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
-    const remaining = contract_amount - total_paid;
-
-    showScreen('form');
-    updateUrl('form');
-    
-    const formContainer = document.getElementById('formContainer');
-    if (!formContainer) {
-      console.error('Элемент #formContainer не найден');
-      alert('Ошибка: элемент формы не найден. Обновите страницу.');
-      return;
-    }
-    
-    formContainer.innerHTML = `
-      <button id="backBtn">← Назад к CRM ID</button>
-      <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
-      <p><strong>Менеджер:</strong> ${manager_name}</p>
-      <p><strong>Тип:</strong> ${
-        deal_type === 'to' ? 'ТО' :
-        deal_type === 'pto' ? 'ПТО' :
-        deal_type === 'eq' ? 'Оборудование' :
-        deal_type === 'comp' ? 'Комплектующие' :
-        deal_type === 'rep' ? 'Ремонты' :
-        deal_type === 'rent' ? 'Аренда' : deal_type
-      }</p>
-      <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
-      <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
-      <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
-        <strong>Осталось оплатить:</strong> ${Math.max(0, remaining).toLocaleString('ru-RU')} ₽
-      </p>
-      <p><strong>УПД:</strong> ${up_signed ? '✅ Подписан' : '❌ Не подписан'}</p>
-      <p><strong>Статус оплаты:</strong> ${paid ? '✅ 100%' : '⏳ Частичная'}</p>
-
-      <label>Сумма нового платежа (₽):</label>
-      <input type="number" id="additional_payment" placeholder="Например: 100000" ${paid ? 'disabled' : ''}>
-
-      <div style="margin-top:15px;">
-        <input type="checkbox" id="update_up_signed" ${up_signed ? 'checked disabled' : ''}>
-        <label for="update_up_signed">Отметить УПД как подписанный</label>
-      </div>
-
-      <button id="updateDealBtn" class="btn-success">Обновить сделку</button>
-      <div id="updateFormResult" class="result"></div>
-    `;
-
-    const updateDealBtn = document.getElementById('updateDealBtn');
-    if (updateDealBtn) {
-      updateDealBtn.addEventListener('click', async () => {
-        const additionalPaymentInput = document.getElementById('additional_payment');
-        const updateUpSignedCheckbox = document.getElementById('update_up_signed');
-        
-        const additionalPayment = additionalPaymentInput ? parseFloat(additionalPaymentInput.value || 0) : 0;
-        const newUpSigned = updateUpSignedCheckbox ? updateUpSignedCheckbox.checked : false;
-
-        if (paid && up_signed === newUpSigned) {
-          alert('Нечего обновлять');
-          return;
-        }
-
-        if (!paid && (isNaN(additionalPayment) || additionalPayment <= 0)) {
-          alert('Введите корректную сумму платежа');
-          return;
-        }
-
-        let newTotalPaid = total_paid;
-        let newPaid = paid;
-        let bonusPaid = deal.bonus_paid || 0;
-
-        if (!paid) {
-          newTotalPaid += additionalPayment;
-          newPaid = newTotalPaid >= contract_amount;
-
-          if (newPaid && bonusPaid === 0) {
-            let revenueForBonus = contract_amount;
-            if (deal_type === 'to') {
-              const arpuValue = arpu_input || contract_amount / 12;
-              revenueForBonus = arpuValue;
-            }
-            bonusPaid = calculateBonus(deal_type, revenueForBonus, is_first, true, newUpSigned, annual_contract);
-          }
-        }
-
-        try {
-          const { error } = await supabaseClient
-            .from('deals')
-            .update({
-              total_paid: newTotalPaid,
-              paid: newPaid,
-              up_signed: newUpSigned,
-              bonus_paid: bonusPaid,
-              updated_at: new Date().toISOString()
-            })
-            .eq('crm_id', crm_id);
-
-          if (error) {
-            alert('Ошибка обновления: ' + error.message);
-            return;
-          }
-
-          const updateFormResult = document.getElementById('updateFormResult');
-          if (updateFormResult) {
-            updateFormResult.innerHTML = `
-              ✅ Сделка обновлена!<br>
-              ${newPaid && bonusPaid > 0 ? `Начислена премия: ${bonusPaid.toLocaleString('ru-RU')} ₽` : 'Премия не начислена'}
-            `;
-            updateFormResult.style.display = 'block';
-          }
-          
-        } catch (error) {
-          console.error('Ошибка обновления сделки:', error);
-          alert('Ошибка при обновлении сделки');
-        }
-      });
-    }
-  }
-
-  // 🔙 Кнопка "Назад"
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'backBtn') {
-      const monthResult = document.getElementById('monthResult');
-      if (monthResult) monthResult.style.display = 'none';
-      
-      // Возвращаемся на экран в зависимости от роли
-      if (currentUserRole === 'rop') {
-        showScreen('rop');
-        updateUrl('rop');
-      } else if (currentUserRole === 'fin') {
-        showScreen('fin');
-        updateUrl('fin');
-      } else if (currentUserRole === 'gen') {
-        showScreen('gen');
-        updateUrl('gen');
-      } else {
+      // Роутинг по ролям
+      if (data.role === 'manager') {
         showScreen('crm');
         updateUrl('crm');
+        // Загружаем модуль менеджера
+        if (!window.managerModuleLoaded) {
+          const script = document.createElement('script');
+          script.src = 'manager.js';
+          script.onload = () => {
+            if (typeof initManagerPanel === 'function') {
+              initManagerPanel(supabaseClient, currentUserPhone, currentUserName);
+            }
+            window.managerModuleLoaded = true;
+          };
+          document.head.appendChild(script);
+        } else {
+          initManagerPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
       }
+      else if (data.role === 'rop') {
+        showScreen('rop');
+        updateUrl('rop');
+        if (!window.ropModuleLoaded) {
+          const script = document.createElement('script');
+          script.src = 'rop.js';
+          script.onload = () => {
+            if (typeof initRopPanel === 'function') {
+              initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+            }
+            window.ropModuleLoaded = true;
+          };
+          document.head.appendChild(script);
+        }
+      }
+      else if (data.role === 'fin') {
+        showScreen('fin');
+        updateUrl('fin');
+        if (!window.finModuleLoaded) {
+          const script = document.createElement('script');
+          script.src = 'fin.js';
+          script.onload = () => {
+            if (typeof initFinPanel === 'function') {
+              initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+            }
+            window.finModuleLoaded = true;
+          };
+          document.head.appendChild(script);
+        }
+      }
+      else if (data.role === 'gen') {
+        showScreen('gen');
+        updateUrl('gen');
+        if (!window.genModuleLoaded) {
+          const script = document.createElement('script');
+          script.src = 'gen.js';
+          script.onload = () => {
+            if (typeof initGenPanel === 'function') {
+              initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+            }
+            window.genModuleLoaded = true;
+          };
+          document.head.appendChild(script);
+        }
+      }
+    } catch (err) {
+      console.error('Ошибка входа:', err);
+      alert('Ошибка подключения. Проверьте интернет.');
     }
+  });
+
+  // 🔙 Поддержка кнопки "Назад"
+  window.addEventListener('popstate', (e) => {
+    const screen = e.state?.screen || 'login';
+    showScreen(screen);
   });
 
   // 🌐 Инициализация из URL
   const screenFromUrl = window.location.hash.replace('#', '') || 'login';
   showScreen(screenFromUrl);
-
-  // 🔙 Поддержка кнопки "Назад" в браузере
-  window.addEventListener('popstate', (event) => {
-    const screen = event.state?.screen || 'login';
-    showScreen(screen);
-  });
-  
-  console.log('app.js: Инициализация менеджера завершена');
 });
