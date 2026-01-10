@@ -350,3 +350,83 @@ function initManagerPanel(supabaseClient, currentUserPhone, currentUserName) {
         </tr>
       `;
     }).join('');
+
+    const basePlan = 800000;
+    const coefficients = [0.7, 1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.1, 1.1, 1.1, 1.4];
+    const plan = basePlan * coefficients[now.getMonth()];
+    const planPercent = (totalMargin / plan) * 100;
+    let finalPayout = planPercent >= 100 ? totalBonus : (planPercent >= 50 ? Math.round(totalBonus * 0.5) : 0);
+
+    resultDiv.innerHTML = `
+      <h3>Премия за ${now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+      <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px;">
+        <strong>План по марже:</strong> ${plan.toLocaleString('ru-RU')} ₽<br>
+        <strong>Набрано маржи:</strong> ${totalMargin.toLocaleString('ru-RU')} ₽ (${planPercent.toFixed(1)}%)<br>
+        <strong>Начислено премий:</strong> ${totalBonus.toLocaleString('ru-RU')} ₽<br>
+        <strong>К выплате:</strong> <span style="font-size:18px; font-weight:bold; color:#1890ff;">${finalPayout.toLocaleString('ru-RU')} ₽</span>
+      </div>
+      <h4>Сделки (${deals.length} шт):</h4>
+      <table style="width:100%; font-size:14px; border-collapse: collapse;">
+        <thead><tr style="background:#f1f1f1;"><th style="padding:8px; border:1px solid #ddd;">CRM ID</th><th style="padding:8px; border:1px solid #ddd;">Тип</th><th style="padding:8px; border:1px solid #ddd;">Договор</th><th style="padding:8px; border:1px solid #ddd;">Оплата</th><th style="padding:8px; border:1px solid #ddd;">Премия</th></tr></thead>
+        <tbody>${dealRows}</tbody>
+      </table>
+    `;
+    resultDiv.style.display = 'block';
+  }
+
+  // Вспомогательные функции
+  function dealTypeLabel(type) {
+    const labels = {
+      'to': 'ТО', 
+      'pto': 'ПТО', 
+      'eq': 'Оборудование',
+      'comp': 'Комплектующие', 
+      'rep': 'Ремонты', 
+      'rent': 'Аренда'
+    };
+    return labels[type] || type;
+  }
+
+  function calculateBonus(dealType, revenue, isFirst, paid, upSigned, annualContract = false) {
+    if (!paid || !upSigned) return 0;
+    if (dealType === 'to') {
+      if (annualContract && revenue >= 35000) return Math.round(revenue * 12 * 0.03);
+      if (isFirst) {
+        if (revenue >= 70000) return 6000;
+        if (revenue >= 35000) return 3000;
+        return 500;
+      } else {
+        if (revenue >= 70000) return 2000;
+        if (revenue >= 35000) return 1000;
+        return 200;
+      }
+    }
+    if (dealType === 'pto') {
+      if (revenue >= 360000) return 6000;
+      if (revenue >= 90000) return 3000;
+      return 1000;
+    }
+    if (dealType === 'comp' || dealType === 'rep') {
+      if (revenue >= 300000) return Math.round(revenue * 0.01);
+      return Math.round(revenue * 0.03);
+    }
+    if (dealType === 'eq') return Math.round(revenue * 0.01);
+    if (dealType === 'rent') return 1500;
+    return 0;
+  }
+
+  function showError(id, text) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+  }
+
+  console.log('Модуль менеджера готов');
+}
+
+// Экспорт
+if (typeof window !== 'undefined') {
+  window.initManagerPanel = initManagerPanel;
+}
