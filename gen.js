@@ -1,4 +1,4 @@
-// gen.js — панель генерального директора (полностью исправленная)
+// gen.js — панель генерального директора (окончательная версия)
 let revenueChart = null;
 let segmentChart = null;
 let genSupabaseClient = null;
@@ -21,22 +21,38 @@ function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
   // Обработчики событий
   document.getElementById('loadGenData').addEventListener('click', loadGenData);
   
+  // Создаем контейнер для кнопок
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.style.cssText = `
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  `;
+  
   // Кнопка перехода к финансисту
   const finControlBtn = document.createElement('button');
   finControlBtn.innerHTML = '📊 Финансовый контроль';
   finControlBtn.className = 'btn-info';
-  finControlBtn.style.marginLeft = '10px';
+  finControlBtn.style.padding = '10px 16px';
   finControlBtn.onclick = goToFinPanel;
-  document.getElementById('loadGenData').parentNode.appendChild(finControlBtn);
+  buttonsContainer.appendChild(finControlBtn);
   
   // Кнопка экспорта
   const exportBtn = document.createElement('button');
   exportBtn.innerHTML = '📥 Экспорт Excel';
   exportBtn.className = 'btn-success';
-  exportBtn.style.marginLeft = '10px';
+  exportBtn.style.padding = '10px 16px';
   exportBtn.onclick = exportToExcel;
-  document.getElementById('loadGenData').parentNode.appendChild(exportBtn);
-
+  buttonsContainer.appendChild(exportBtn);
+  
+  // Вставляем кнопки в правильное место
+  const dateFilterContainer = document.querySelector('#genScreen .card > div:first-child');
+  if (dateFilterContainer) {
+    dateFilterContainer.appendChild(buttonsContainer);
+  }
+  
   // Добавляем фильтры
   addFilters();
   
@@ -54,13 +70,23 @@ function addFilters() {
     display: flex;
     gap: 15px;
     flex-wrap: wrap;
-    align-items: end;
+    align-items: center;
   `;
   
   filterContainer.innerHTML = `
-    <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Сегмент:</label>
-      <select id="genSegmentFilter" style="padding:8px 12px; border-radius:4px; border:1px solid #ddd; min-width:150px; background:white; font-size:14px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <label style="font-weight: bold; color: #555; white-space: nowrap;">С:</label>
+      <input type="date" id="genDateFrom" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; background: white;">
+    </div>
+    
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <label style="font-weight: bold; color: #555; white-space: nowrap;">По:</label>
+      <input type="date" id="genDateTo" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; background: white;">
+    </div>
+    
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <label style="font-weight: bold; color: #555; white-space: nowrap;">Сегмент:</label>
+      <select id="genSegmentFilter" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; background: white; min-width: 140px;">
         <option value="">Все сегменты</option>
         <option value="to">ТО</option>
         <option value="pto">ПТО</option>
@@ -70,22 +96,35 @@ function addFilters() {
         <option value="rent">Аренда</option>
       </select>
     </div>
-    <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Менеджер:</label>
-      <select id="genManagerFilter" style="padding:8px 12px; border-radius:4px; border:1px solid #ddd; min-width:150px; background:white; font-size:14px;">
+    
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <label style="font-weight: bold; color: #555; white-space: nowrap;">Менеджер:</label>
+      <select id="genManagerFilter" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; background: white; min-width: 140px;">
         <option value="">Все менеджеры</option>
         <!-- Список загрузится динамически -->
       </select>
     </div>
-    <div>
-      <button id="resetFilters" style="padding:8px 16px; background:#1890ff; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">
+    
+    <div style="display: flex; gap: 10px; margin-left: auto;">
+      <button id="loadGenData" style="padding: 10px 20px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; white-space: nowrap;">
+        Загрузить
+      </button>
+      
+      <button id="resetFilters" style="padding: 10px 20px; background: #f0f0f0; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; white-space: nowrap;">
         Сбросить фильтры
       </button>
     </div>
   `;
   
-  const loadButton = document.getElementById('loadGenData');
-  loadButton.parentNode.insertBefore(filterContainer, loadButton);
+  // Вставляем фильтры в начало карточки
+  const card = document.querySelector('#genScreen .card');
+  if (card) {
+    const firstChild = card.firstChild;
+    card.insertBefore(filterContainer, firstChild);
+  }
+  
+  // Обновляем обработчик загрузки данных
+  document.getElementById('loadGenData').addEventListener('click', loadGenData);
   
   // Обработчик сброса фильтров
   document.getElementById('resetFilters').addEventListener('click', () => {
@@ -310,22 +349,22 @@ function showLoadingState() {
 
 // ✅ ИСПРАВЛЕНО: Обновление ВСЕХ KPI блоков
 function updateAllKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
-  // Основные KPI (уже существующие в HTML)
+  // ✅ ИСПРАВЛЕНО: Обновляем существующие блоки
   document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
-  document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
+  document.getElementById('totalMargin').textContent = formatCurrency(actualMargin); // ✅ Это ФАКТИЧЕСКАЯ маржа
   document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
   document.getElementById('totalDeals').textContent = deals;
   
   // ✅ ДОБАВЛЯЕМ НОВЫЕ KPI БЛОКИ
-  const kpiContainer = document.querySelector('.kpi-container');
+  let kpiContainer = document.querySelector('.kpi-container');
   if (kpiContainer) {
     kpiContainer.remove(); // Удаляем старый контейнер
   }
   
-  // Создаем новый контейнер для KPI
-  const newKpiContainer = document.createElement('div');
-  newKpiContainer.className = 'kpi-container';
-  newKpiContainer.style.cssText = `
+  // Создаем новый контейнер для дополнительных KPI
+  kpiContainer = document.createElement('div');
+  kpiContainer.className = 'kpi-container';
+  kpiContainer.style.cssText = `
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 15px;
@@ -333,45 +372,59 @@ function updateAllKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, a
     width: 100%;
   `;
   
-  // HTML для всех KPI блоков
-  newKpiContainer.innerHTML = `
-    <div style="background:#e6f7ff; padding:15px; border-radius:8px; border:1px solid #91d5ff; min-height:100px;">
+  // HTML для дополнительных KPI блоков
+  kpiContainer.innerHTML = `
+    <div style="background:#e6f7ff; padding:15px; border-radius:8px; border:1px solid #91d5ff; min-height:100px; display:flex; flex-direction:column; justify-content:space-between;">
       <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:14px;">📊 Теоретическая маржа</h3>
-      <p style="font-size:20px; margin:0; font-weight:bold; color:#1890ff;">
-        ${formatCurrency(theoreticalMargin)}
-      </p>
-      <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
+      <div>
+        <p style="font-size:20px; margin:0; font-weight:bold; color:#1890ff;">
+          ${formatCurrency(theoreticalMargin)}
+        </p>
+        <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
+      </div>
     </div>
     
-    <div style="background:#f6ffed; padding:15px; border-radius:8px; border:1px solid #b7eb8f; min-height:100px;">
+    <div style="background:#f6ffed; padding:15px; border-radius:8px; border:1px solid #b7eb8f; min-height:100px; display:flex; flex-direction:column; justify-content:space-between;">
       <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:14px;">💰 Средний чек</h3>
-      <p style="font-size:20px; margin:0; font-weight:bold; color:#52c41a;">
-        ${formatCurrency(avgDeal)}
-      </p>
-      <small style="color:#52c41a;">на сделку</small>
+      <div>
+        <p style="font-size:20px; margin:0; font-weight:bold; color:#52c41a;">
+          ${formatCurrency(avgDeal)}
+        </p>
+        <small style="color:#52c41a;">на сделку</small>
+      </div>
     </div>
     
-    <div style="background:#fff1f0; padding:15px; border-radius:8px; border:1px solid #ffa39e; min-height:100px;">
+    <div style="background:#fff1f0; padding:15px; border-radius:8px; border:1px solid #ffa39e; min-height:100px; display:flex; flex-direction:column; justify-content:space-between;">
       <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:14px;">💸 Общие расходы</h3>
-      <p style="font-size:20px; margin:0; font-weight:bold; color:#ff4d4f;">
-        ${formatCurrency(expenses)}
-      </p>
-      <small style="color:#ff4d4f;">всего</small>
+      <div>
+        <p style="font-size:20px; margin:0; font-weight:bold; color:#ff4d4f;">
+          ${formatCurrency(expenses)}
+        </p>
+        <small style="color:#ff4d4f;">всего</small>
+      </div>
     </div>
     
-    <div style="background:#fffbe6; padding:15px; border-radius:8px; border:1px solid #ffe58f; min-height:100px;">
+    <div style="background:#fffbe6; padding:15px; border-radius:8px; border:1px solid #ffe58f; min-height:100px; display:flex; flex-direction:column; justify-content:space-between;">
       <h3 style="margin:0 0 10px 0; color:#faad14; font-size:14px;">📈 Рентабельность</h3>
-      <p style="font-size:20px; margin:0; font-weight:bold; color:#faad14;">
-        ${actualMarginPercent.toFixed(1)}%
-      </p>
-      <small style="color:#faad14;">фактическая</small>
+      <div>
+        <p style="font-size:20px; margin:0; font-weight:bold; color:#faad14;">
+          ${actualMarginPercent.toFixed(1)}%
+        </p>
+        <small style="color:#faad14;">фактическая</small>
+      </div>
     </div>
   `;
   
-  // Вставляем после существующих KPI
-  const existingKpis = document.querySelector('#genScreen .card > div:first-child');
+  // Вставляем после существующих KPI (4 основных блока)
+  const existingKpis = document.querySelector('#genScreen .card > div:nth-child(2)'); // Второй div в карточке
   if (existingKpis) {
-    existingKpis.parentNode.insertBefore(newKpiContainer, existingKpis.nextSibling);
+    existingKpis.parentNode.insertBefore(kpiContainer, existingKpis.nextSibling);
+  } else {
+    // Если не нашли, вставляем в начало
+    const card = document.querySelector('#genScreen .card');
+    if (card) {
+      card.appendChild(kpiContainer);
+    }
   }
 }
 
@@ -498,7 +551,7 @@ function renderCharts(weeklyData, segmentData) {
     segmentContainer.style.cssText = `
       margin-top: ${isMobile ? '15px' : '20px'};
       width: 100%;
-      height: ${isMobile ? '250px' : '350px'}; /* ✅ На 30% больше чем было */
+      height: ${isMobile ? '280px' : '380px'}; /* ✅ На 30% больше чем было */
       position: relative;
       padding: 10px;
       background: white;
@@ -507,10 +560,10 @@ function renderCharts(weeklyData, segmentData) {
     `;
     
     segmentContainer.innerHTML = `
-      <h3 style="margin:0 0 10px 0; font-size:${isMobile ? '14px' : '16px'}; color:#333;">
+      <h3 style="margin:0 0 15px 0; font-size:${isMobile ? '14px' : '16px'}; color:#333; font-weight:bold;">
         📊 Распределение по сегментам
       </h3>
-      <div style="position:relative; height:calc(100% - 30px);">
+      <div style="position:relative; height:calc(100% - 40px);">
         <canvas id="segmentChart"></canvas>
       </div>
     `;
@@ -547,11 +600,11 @@ function renderCharts(weeklyData, segmentData) {
           legend: {
             position: isMobile ? 'bottom' : 'right',
             labels: {
-              boxWidth: isMobile ? 8 : 10,
+              boxWidth: isMobile ? 10 : 12,
               font: {
-                size: isMobile ? 9 : 11 // ✅ Увеличили шрифт
+                size: isMobile ? 10 : 12 // ✅ Увеличили шрифт
               },
-              padding: isMobile ? 12 : 15
+              padding: isMobile ? 12 : 18
             }
           },
           tooltip: {
