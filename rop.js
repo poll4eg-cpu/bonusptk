@@ -454,7 +454,6 @@ async function showRopCreateForm() {
             arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
             margin: margin,
             bonus_paid: bonusPaid,
-            created_by: ropCurrentUserName,
             created_at: new Date().toISOString()
           }]);
 
