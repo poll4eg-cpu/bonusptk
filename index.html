@@ -178,58 +178,97 @@
       </div>
     </div>
 
-    <!-- 🔹 Панель генерального директора -->
-    <div id="genScreen" class="card" style="display:none;">
-      <h2><i class="fas fa-crown"></i> Панель генерального директора</h2>
-      
-      <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
-        <div>
-          <label>С:</label>
-          <input type="date" id="genDateFrom">
-        </div>
-        <div>
-          <label>По:</label>
-          <input type="date" id="genDateTo">
-        </div>
-        <button id="loadGenData">Загрузить</button>
-      </div>
-
-      <!-- KPI -->
-      <div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;">
-        <div style="background:#f0f9ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="margin:0 0 10px 0; color:#1890ff;">Выручка</h3>
-          <p id="totalRevenue" style="font-size:24px; margin:0; font-weight:bold;">0 ₽</p>
-        </div>
-        <div style="background:#f0fff4; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="margin:0 0 10px 0; color:#52c41a;">Маржа</h3>
-          <p id="totalMargin" style="font-size:24px; margin:0; font-weight:bold;">0 ₽</p>
-        </div>
-        <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="margin:0 0 10px 0; color:#faad14;">Маржинальность</h3>
-          <p id="marginPercent" style="font-size:24px; margin:0; font-weight:bold;">0%</p>
-        </div>
-        <div style="background:#fff0f6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="margin:0 0 10px 0; color:#eb2f96;">Сделок</h3>
-          <p id="totalDeals" style="font-size:24px; margin:0; font-weight:bold;">0</p>
-        </div>
-      </div>
-     <div id="analytics"></div>
-      <!-- График -->
-      <div style="margin-top:30px;">
-        <h3>Динамика по неделям</h3>
-        <canvas id="revenueChart" height="120"></canvas>
-      </div>
-
-      <!-- Предупреждения -->
-      <div id="alerts" style="margin-top:30px;"></div>
+   <!-- 🔹 Панель генерального директора -->
+<div id="genScreen" class="card" style="display:none;">
+  <h2><i class="fas fa-crown"></i> Панель генерального директора</h2>
+  
+  <!-- Фильтры -->
+  <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+    <div>
+      <label>С:</label>
+      <input type="date" id="genDateFrom">
     </div>
+    <div>
+      <label>По:</label>
+      <input type="date" id="genDateTo">
+    </div>
+    <div>
+      <label>Менеджер:</label>
+      <select id="genManagerFilter">
+        <option value="">Все менеджеры</option>
+      </select>
+    </div>
+    <div>
+      <label>Сегмент:</label>
+      <select id="genSegmentFilter">
+        <option value="">Все сегменты</option>
+        <option value="to">ТО</option>
+        <option value="pto">ПТО</option>
+        <option value="eq">Оборудование</option>
+        <option value="comp">Комплектующие</option>
+        <option value="rep">Ремонты</option>
+        <option value="rent">Аренда</option>
+      </select>
+    </div>
+    <button id="loadGenData">Загрузить</button>
+    <button id="resetGenFilters" class="btn-secondary">Сбросить</button>
+    <button id="goToFinFromGen" class="btn-info" style="margin-left:auto;">📊 Финансовый контроль</button>
+  </div>
 
+  <!-- KPI -->
+  <div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;">
+    <div style="background:#f0f9ff; padding:15px; border-radius:8px; min-width:180px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:14px;">Выручка</h3>
+      <p id="totalRevenue" style="font-size:22px; margin:0; font-weight:bold;">0 ₽</p>
+    </div>
+    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:180px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:14px;">Теор. маржа</h3>
+      <p id="theoreticalMargin" style="font-size:22px; margin:0; font-weight:bold;">0 ₽</p>
+    </div>
+    <div style="background:#f0fff4; padding:15px; border-radius:8px; min-width:180px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:14px;">Факт. маржа</h3>
+      <p id="actualMargin" style="font-size:22px; margin:0; font-weight:bold;">0 ₽</p>
+    </div>
+    <div style="background:#fff0f6; padding:15px; border-radius:8px; min-width:180px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <h3 style="margin:0 0 10px 0; color:#eb2f96; font-size:14px;">Средний чек</h3>
+      <p id="avgDealSize" style="font-size:22px; margin:0; font-weight:bold;">0 ₽</p>
+    </div>
+  </div>
+
+  <!-- График динамики -->
+  <div style="margin-top:30px;">
+    <h3>Динамика по неделям</h3>
+    <canvas id="weeklyChart" height="200"></canvas>
+  </div>
+
+  <!-- График по сегментам -->
+  <div style="margin-top:30px;">
+    <h3>Маржа по сегментам</h3>
+    <canvas id="segmentChart" height="150"></canvas>
+  </div>
+
+  <!-- Топ-10 сделок -->
+  <div style="margin-top:30px;">
+    <h3>🏆 Топ-10 сделок по фактической марже</h3>
+    <div id="topDealsList" style="max-height:300px; overflow-y:auto;"></div>
+  </div>
+
+  <!-- Топ менеджеров -->
+  <div style="margin-top:30px;">
+    <h3>👥 Топ менеджеров</h3>
+    <div id="topManagersList" style="max-height:300px; overflow-y:auto;"></div>
+  </div>
+
+  <!-- Предупреждения -->
+  <div id="alerts" style="margin-top:30px;"></div>
+</div>
     <footer>Разработчик — Илья Галунин</footer>
   </div>
 
   
 </body>
 </html>
+
 
 
 
