@@ -1,8 +1,7 @@
-// app.js — общий каркас приложения
 document.addEventListener('DOMContentLoaded', () => {
   console.log('app.js: инициализация...');
 
-  // 🔑 Supabase (без пробелов!)
+  // ✅ УБРАН ПРОБЕЛ В КОНЦЕ!
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -10,28 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUserPhone = null;
   let currentUserName = null;
   let currentUserRole = null;
-
-  // 💾 Кэширование данных (5 минут)
-  const cache = {
-    deals: null,
-    dealsTimestamp: 0,
-    users: null,
-    usersTimestamp: 0,
-    TTL: 5 * 60 * 1000 // 5 минут
-  };
-
-  // 📦 Утилита кэширования
-  window.cachedSupabaseQuery = async (key, queryFn) => {
-    const now = Date.now();
-    if (cache[key] && now - cache[`${key}Timestamp`] < cache.TTL) {
-      console.log(`Кэш использован для: ${key}`);
-      return cache[key];
-    }
-    const result = await queryFn();
-    cache[key] = result;
-    cache[`${key}Timestamp`] = now;
-    return result;
-  };
 
   // 💡 Управление URL
   function updateUrl(screenName) {
@@ -47,7 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el) el.style.display = 'none';
     });
 
-    const target = document.getElementById(screenName === 'form' ? 'mainApp' : screenName + 'Screen');
+    const target = document.getElementById(
+      screenName === 'form' ? 'mainApp' : screenName + 'Screen'
+    );
     if (target) target.style.display = 'block';
   }
 
@@ -80,12 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Сохраняем данные пользователя
       currentUserPhone = phone;
       currentUserName = data.name;
       currentUserRole = data.role;
 
-      // Скрываем логин
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('loginError').style.display = 'none';
 
@@ -93,20 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.role === 'manager') {
         showScreen('crm');
         updateUrl('crm');
-        // Загружаем модуль менеджера
-        if (!window.managerModuleLoaded) {
-          const script = document.createElement('script');
-          script.src = 'manager.js';
-          script.onload = () => {
-            if (typeof initManagerPanel === 'function') {
-              initManagerPanel(supabaseClient, currentUserPhone, currentUserName);
-            }
-            window.managerModuleLoaded = true;
-          };
-          document.head.appendChild(script);
-        } else {
-          initManagerPanel(supabaseClient, currentUserPhone, currentUserName);
-        }
       }
       else if (data.role === 'rop') {
         showScreen('rop');
@@ -158,6 +121,74 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Ошибка подключения. Проверьте интернет.');
     }
   });
+
+  // 🔍 Проверка CRM ID
+  document.getElementById('checkCrmBtn')?.addEventListener('click', async () => {
+    const crmId = document.getElementById('inputCrmId')?.value.trim();
+    if (!crmId) {
+      document.getElementById('crmError').textContent = 'Введите номер сделки';
+      document.getElementById('crmError').style.display = 'block';
+      return;
+    }
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('deals')
+        .select('*')
+        .eq('crm_id', crmId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        showUpdateForm(data);
+      } else {
+        showCreateForm(crmId);
+      }
+    } catch (err) {
+      document.getElementById('crmError').textContent = 'Ошибка: ' + err.message;
+      document.getElementById('crmError').style.display = 'block';
+    }
+  });
+
+  // ➕ Форма создания
+  function showCreateForm(crmId) {
+    showScreen('form');
+    updateUrl('form');
+    const container = document.getElementById('formContainer');
+    if (!container) {
+      alert('Ошибка: форма не найдена');
+      return;
+    }
+    container.innerHTML = `
+      <button id="backBtn">← Назад</button>
+      <h3>Создать сделку: ${crmId}</h3>
+      <p>Функционал создания сделки временно отключен для тестирования.</p>
+    `;
+    document.getElementById('backBtn')?.addEventListener('click', () => {
+      showScreen('crm');
+      updateUrl('crm');
+    });
+  }
+
+  // 🔄 Форма обновления
+  function showUpdateForm(deal) {
+    showScreen('form');
+    updateUrl('form');
+    const container = document.getElementById('formContainer');
+    if (!container) {
+      alert('Ошибка: форма не найдена');
+      return;
+    }
+    container.innerHTML = `
+      <button id="backBtn">← Назад</button>
+      <h3>Обновить сделку: ${deal.crm_id}</h3>
+      <p>Функционал обновления временно отключен для тестирования.</p>
+    `;
+    document.getElementById('backBtn')?.addEventListener('click', () => {
+      showScreen('crm');
+      updateUrl('crm');
+    });
+  }
 
   // 🔙 Поддержка кнопки "Назад"
   window.addEventListener('popstate', (e) => {
