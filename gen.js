@@ -43,7 +43,7 @@ function initGenPanel(supabaseClient, currentUserPhone, currentUserName) {
   loadGenData(); // загрузить при старте
 }
 
-// Добавление фильтров — ИСПРАВЛЕНО: кнопка "Сбросить фильтры" читаемая
+// Добавление фильтров — ИСПРАВЛЕНО: кнопка читаемая
 function addFilters() {
   const filterContainer = document.createElement('div');
   filterContainer.style.cssText = `
@@ -84,17 +84,6 @@ function addFilters() {
       </button>
     </div>
   `;
-  
-  const loadButton = document.getElementById('loadGenData');
-  loadButton.parentNode.insertBefore(filterContainer, loadButton);
-  
-  // Обработчик сброса фильтров
-  document.getElementById('resetFilters').addEventListener('click', () => {
-    document.getElementById('genSegmentFilter').value = '';
-    document.getElementById('genManagerFilter').value = '';
-    loadGenData();
-  });
-}
   
   const loadButton = document.getElementById('loadGenData');
   loadButton.parentNode.insertBefore(filterContainer, loadButton);
@@ -313,29 +302,30 @@ function calculateTheoreticalMargin(dealType, amount) {
 }
 
 function showLoadingState() {
-  // Очищаем все KPI блоки
-  const kpis = document.querySelectorAll('.kpi-item');
-  kpis.forEach(kpi => {
-    const valueSpan = kpi.querySelector('.kpi-value');
-    if (valueSpan) valueSpan.textContent = 'Загрузка...';
-    const subtitleSpan = kpi.querySelector('.kpi-subtitle');
-    if (subtitleSpan) subtitleSpan.textContent = '...';
-  });
+  document.getElementById('totalRevenue').textContent = 'Загрузка...';
+  document.getElementById('totalMargin').textContent = 'Загрузка...';
+  document.getElementById('marginPercent').textContent = '...';
+  document.getElementById('totalDeals').textContent = '...';
 }
 
-// Обновление KPI блоков - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// Обновление KPI блоков
 function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
-  // Создаем основной контейнер для KPI
-  let kpiContainer = document.querySelector('.kpi-main-container');
+  // Основные KPI (фактические значения)
+  document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
+  document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
+  document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
+  document.getElementById('totalDeals').textContent = deals;
+  
+  // Создаем или обновляем дополнительные KPI блоки
+  let kpiContainer = document.querySelector('.kpi-container');
   if (!kpiContainer) {
     kpiContainer = document.createElement('div');
-    kpiContainer.className = 'kpi-main-container';
+    kpiContainer.className = 'kpi-container';
     kpiContainer.style.cssText = `
       display: flex;
-      flex-wrap: wrap;
       gap: 15px;
+      flex-wrap: wrap;
       margin: 20px 0;
-      justify-content: space-between;
     `;
     
     const existingKPIs = document.querySelector('#genScreen .card > div:first-child');
@@ -344,93 +334,37 @@ function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgD
     }
   }
   
-  // Очищаем и заполняем контейнер
-  kpiContainer.innerHTML = '';
-  
-  // Функция для создания KPI элемента
-  function createKPIElement(title, value, subtitle, color, icon) {
-    const kpi = document.createElement('div');
-    kpi.className = 'kpi-item';
-    kpi.style.cssText = `
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border: 1px solid #eee;
-      min-width: 180px;
-      flex: 1;
-      min-width: 180px;
-    `;
-    
-    kpi.innerHTML = `
-      <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="font-size: 20px; margin-right: 8px; color: ${color}">${icon}</span>
-        <h3 style="margin: 0; font-size: 14px; color: #333; font-weight: 600;">${title}</h3>
-      </div>
-      <div class="kpi-value" style="font-size: 24px; font-weight: bold; color: ${color}; margin-bottom: 5px;">
-        ${value}
-      </div>
-      <div class="kpi-subtitle" style="font-size: 12px; color: #666;">
-        ${subtitle}
-      </div>
-    `;
-    
-    return kpi;
-  }
-  
-  // ✅ 1. Выручка
-  kpiContainer.appendChild(createKPIElement(
-    'Выручка',
-    formatCurrency(revenue),
-    'Общая сумма контрактов',
-    '#1890ff',
-    '💰'
-  ));
-  
-  // ✅ 2. Теоретическая маржа (НОВЫЙ КВАДРАТИК)
-  kpiContainer.appendChild(createKPIElement(
-    'Теор. маржа',
-    formatCurrency(theoreticalMargin),
-    `${theoreticalMarginPercent.toFixed(1)}% от выручки`,
-    '#faad14',
-    '📊'
-  ));
-  
-  // ✅ 3. Фактическая маржа (рассчитывается как выручка - расходы)
-  kpiContainer.appendChild(createKPIElement(
-    'Факт. маржа',
-    formatCurrency(actualMargin),
-    `${actualMarginPercent.toFixed(1)}% от выручки`,
-    '#52c41a',
-    '✅'
-  ));
-  
-  // ✅ 4. Маржинальность (процент от выручки)
-  kpiContainer.appendChild(createKPIElement(
-    'Маржинальность',
-    `${actualMarginPercent.toFixed(1)}%`,
-    'Фактическая рентабельность',
-    '#eb2f96',
-    '📈'
-  ));
-  
-  // ✅ 5. Количество сделок
-  kpiContainer.appendChild(createKPIElement(
-    'Сделок',
-    totalDeals,
-    `Средний чек: ${formatCurrency(avgDeal, true)}`,
-    '#722ed1',
-    '📋'
-  ));
-  
-  // ✅ 6. Расходы
-  kpiContainer.appendChild(createKPIElement(
-    'Расходы',
-    formatCurrency(expenses),
-    'Фактические затраты',
-    '#ff4d4f',
-    '💸'
-  ));
+  // Дополнительные KPI
+  kpiContainer.innerHTML = `
+    <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
+      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
+        ${formatCurrency(theoreticalMargin)}
+      </p>
+      <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
+    </div>
+    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
+      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
+        ${formatCurrency(avgDeal)}
+      </p>
+      <small style="color:#52c41a;">на сделку</small>
+    </div>
+    <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
+      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
+        ${formatCurrency(expenses)}
+      </p>
+      <small style="color:#ff4d4f;">всего</small>
+    </div>
+    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffe58f;">
+      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:16px;">📈 Рентабельность</h3>
+      <p style="font-size:22px; margin:0; font-weight:bold; color:#faad14;">
+        ${actualMarginPercent.toFixed(1)}%
+      </p>
+      <small style="color:#faad14;">фактическая</small>
+    </div>
+  `;
 }
 
 // Рендер графиков — ИСПРАВЛЕНО: убран дублирующийся заголовок
@@ -591,64 +525,6 @@ function renderCharts(weeklyData, segmentData) {
     segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
   }
 }
-
-    
-    // Создаем кастомную легенду
-    const legendContainer = document.getElementById('segmentLegend');
-    legendContainer.innerHTML = '';
-    
-    segmentLabels.forEach((segment, index) => {
-      const legendItem = document.createElement('div');
-      legendItem.style.cssText = `
-        display: flex;
-        align-items: center;
-        margin-bottom: 8px;
-        padding: 5px;
-        border-radius: 4px;
-        background: ${index % 2 === 0 ? '#fafafa' : 'white'};
-      `;
-      
-      const colorBox = document.createElement('div');
-      colorBox.style.cssText = `
-        width: 12px;
-        height: 12px;
-        background: ${segmentColors[index]};
-        border-radius: 2px;
-        margin-right: 8px;
-      `;
-      
-      const labelText = document.createElement('div');
-      labelText.style.cssText = `
-        font-size: 12px;
-        flex: 1;
-      `;
-      
-      const valueText = document.createElement('div');
-      valueText.style.cssText = `
-        font-size: 11px;
-        font-weight: bold;
-        color: #333;
-      `;
-      
-      const value = segmentData[segment].revenue;
-      const total = segmentRevenue.reduce((a, b) => a + b, 0);
-      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-      
-      labelText.textContent = getSegmentLabel(segment);
-      valueText.textContent = `${formatCurrency(value, true)} (${percentage}%)`;
-      
-      legendItem.appendChild(colorBox);
-      legendItem.appendChild(labelText);
-      legendItem.appendChild(valueText);
-      legendContainer.appendChild(legendItem);
-    });
-  } else {
-    document.getElementById('segmentChart').parentNode.innerHTML = 
-      '<p style="text-align:center; color:#666; padding:40px; font-size:14px;">Нет данных для графика сегментов</p>';
-  }
-}
-
-// Остальные функции остаются без изменений (showAnalytics, populateManagerFilter, showAlerts и т.д.)
 
 // Показать аналитику
 function showAnalytics(topDeals, topManagers, segmentData) {
@@ -887,7 +763,7 @@ async function exportToExcel() {
       getSegmentLabel(deal.deal_type),
       deal.contract_amount,
       deal.total_paid,
-      calculateTheoreticalMargin(deal.deal_type, deal.contract_amount), // ✅ Рассчитываем теоретическую маржу
+      calculateTheoreticalMargin(deal.deal_type, deal.contract_amount),
       new Date(deal.created_at).toLocaleDateString('ru-RU')
     ]);
     
