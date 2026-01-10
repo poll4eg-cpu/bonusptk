@@ -5,8 +5,8 @@
   <title>Калькулятор премий</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
+  <!-- ✅ УБРАНЫ ПРОБЕЛЫ -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <!-- УБЕРИТЕ defer ОТСЮДА -->
 </head>
 <body>
   <div class="container">
@@ -31,7 +31,7 @@
       <h2><i class="fas fa-file-contract"></i> Работа со сделкой</h2>
       <label>Номер сделки в CRM (из Битрикс):</label>
       <input type="text" id="inputCrmId" placeholder="Например: 12345">
-      <button id="checkCrmBtn" class="btn-success">Найти / Создать</button>
+      <button id="checkCmBtn" class="btn-success">Найти / Создать</button>
       <div id="crmError" class="error-message"></div>
 
       <button id="checkMonthBtn" class="btn-warning">Посмотреть премию за месяц</button>
@@ -48,7 +48,12 @@
       </div>
     </div>
 
-    <!-- Контейнеры для форм создания/редактирования -->
+    <!-- ⚠️ ОБЯЗАТЕЛЬНО: контейнер для форм менеджера -->
+    <div id="mainApp" style="display:none;">
+      <div id="formContainer"></div>
+    </div>
+
+    <!-- Формы РОПа -->
     <div id="createDealForm" style="display: none;"></div>
     <div id="editDealForm" style="display: none;"></div>
 
@@ -220,25 +225,13 @@
     <footer>Разработчик — Илья Галунин</footer>
   </div>
 
-  <!-- Загружаем скрипты в конце body -->
+  <!-- ✅ УБРАНЫ ПРОБЕЛЫ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <!-- Ваши скрипты в правильном порядке -->
-  <script>
-    // Проверяем загрузку скриптов
-    console.log('DOM загружен, начинаем загрузку скриптов...');
-  </script>
-  
-  <!-- Загружаем ваши скрипты -->
+  <!-- Скрипты в правильном порядке -->
   <script src="fin.js"></script>
   <script src="rop.js"></script>
   <script src="app.js"></script>
-  
-  <script>
-    // Проверка загрузки функций
-    console.log('initRopPanel доступна:', typeof initRopPanel === 'function');
-    console.log('initFinPanel доступна:', typeof initFinPanel === 'function');
-  </script>
 </body>
 </html>
