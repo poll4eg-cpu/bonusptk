@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('app.js: DOM загружен, инициализация...');
-
-  // 🔑 УБРАЛ ПРОБЕЛЫ В URL!
   const supabaseUrl = 'https://ebgqaswbnsxklbshtkzo.supabase.co';
   const supabaseAnonKey = 'sb_publishable_xUFmnxRAnAPtHvQ9OJonwA_Tzt7TBui';
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -16,33 +13,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.history.pushState({ screen: screenName }, '', newUrl);
   }
 
-  // 🔧 Исправленная функция showScreen — теперь показывает ВСЕ экраны
   function showScreen(screenName) {
-    console.log('showScreen вызывается для:', screenName);
-    
-    // Скрываем все экраны
-    const screens = ['loginScreen', 'crmScreen', 'mainApp', 'ropScreen', 'finScreen', 'genScreen'];
-    screens.forEach(screenId => {
-      const element = document.getElementById(screenId);
-      if (element) {
-        element.style.display = 'none';
-      }
-    });
-    
-    // Показываем нужный экран
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('crmScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    if (document.getElementById('ropScreen')) {
+      document.getElementById('ropScreen').style.display = 'none';
+    }
+
     if (screenName === 'login') {
       document.getElementById('loginScreen').style.display = 'block';
     } else if (screenName === 'crm') {
       document.getElementById('crmScreen').style.display = 'block';
     } else if (screenName === 'form') {
-      // ⬇️ ОБЯЗАТЕЛЬНО: показываем mainApp для форм менеджера
       document.getElementById('mainApp').style.display = 'block';
-    } else if (screenName === 'rop') {
-      document.getElementById('ropScreen').style.display = 'block';
-    } else if (screenName === 'fin') {
-      document.getElementById('finScreen').style.display = 'block';
-    } else if (screenName === 'gen') {
-      document.getElementById('genScreen').style.display = 'block';
     }
   }
 
@@ -51,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
     const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999);
 
+    // Загружаем сделки
     const { data: deals, error: dealsError } = await supabaseClient
       .from('deals')
       .select('manager_name, margin')
@@ -59,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (dealsError || !deals) return [];
 
+    // Получаем роли
     const managerNames = [...new Set(deals.map(d => d.manager_name))];
     const { data: users, error: usersError } = await supabaseClient
       .from('allowed_users')
@@ -67,10 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (usersError) return [];
 
+    // Только менеджеры
     const managerNamesOnly = new Set(
       users.filter(u => u.role === 'manager').map(u => u.name)
     );
 
+    // Считаем маржу
     const managerStats = {};
     deals.forEach(deal => {
       if (managerNamesOnly.has(deal.manager_name)) {
@@ -115,89 +103,116 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
-  // 👤 Авторизация
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const phone = document.getElementById('loginPhone').value.trim();
-    if (!phone) { 
-      alert('Введите номер телефона'); 
-      return; 
+ // 👤 Авторизация
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!phone) { 
+    alert('Введите номер телефона'); 
+    return; 
+  }
+
+  const passwordField = document.getElementById('passwordField');
+  if (passwordField.style.display !== 'block') {
+    passwordField.style.display = 'block';
+    document.getElementById('loginPassword').focus();
+    document.getElementById('loginBtn').textContent = 'Войти';
+    return;
+  }
+
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!password) { 
+    alert('Введите пароль'); 
+    return; 
+  }
+
+  const { data, error } = await supabaseClient
+    .from('allowed_users')
+    .select('phone, name, role, password')
+    .eq('phone', phone)
+    .single();
+
+  if (error || !data) {
+    document.getElementById('loginError').textContent = 'Номер не найден.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  if (password !== data.password) {
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').textContent = 'Неверный пароль.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
+  currentUserPhone = phone;
+  currentUserName = data.name;
+
+  // 🔑 Определяем экран по роли
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+
+  if (data.role === 'rop') {
+    // Панель РОПа
+    document.getElementById('ropScreen').style.display = 'block';
+    
+    if (!window.ropModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'rop.js';
+      script.onload = () => {
+        if (typeof initRopPanel === 'function') {
+          initRopPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.ropModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initRopPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-
-    const passwordField = document.getElementById('passwordField');
-    if (passwordField.style.display !== 'block') {
-      passwordField.style.display = 'block';
-      document.getElementById('loginPassword').focus();
-      document.getElementById('loginBtn').textContent = 'Войти';
-      return;
+  } 
+  else if (data.role === 'fin') {
+    // Панель финансиста
+    document.getElementById('finScreen').style.display = 'block';
+    
+    if (!window.finModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'fin.js';
+      script.onload = () => {
+        if (typeof initFinPanel === 'function') {
+          initFinPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.finModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initFinPanel(supabaseClient, currentUserPhone, currentUserName);
     }
-
-    const password = document.getElementById('loginPassword').value.trim();
-    if (!password) { 
-      alert('Введите пароль'); 
-      return; 
+  }
+  else if (data.role === 'gen') {
+    // Панель генерального директора
+    document.getElementById('genScreen').style.display = 'block';
+    
+    if (!window.genModuleLoaded) {
+      const script = document.createElement('script');
+      script.src = 'gen.js';
+      script.onload = () => {
+        if (typeof initGenPanel === 'function') {
+          initGenPanel(supabaseClient, currentUserPhone, currentUserName);
+        }
+        window.genModuleLoaded = true;
+      };
+      document.head.appendChild(script);
+    } else {
+      initGenPanel(supabaseClient, currentUserPhone, currentUserName);
     }
+  }
+  else {
+    // Обычный менеджер
+    showScreen('crm');
+    updateUrl('crm');
+  }
+});
 
-    const { data, error } = await supabaseClient
-      .from('allowed_users')
-      .select('phone, name, role, password')
-      .eq('phone', phone)
-      .single();
-
-    if (error || !data) {
-      document.getElementById('loginError').textContent = 'Номер не найден.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-
-    if (password !== data.password) {
-      document.getElementById('loginPassword').value = '';
-      document.getElementById('loginError').textContent = 'Неверный пароль.';
-      document.getElementById('loginError').style.display = 'block';
-      return;
-    }
-
-    currentUserPhone = phone;
-    currentUserName = data.name;
-    currentUserRole = data.role;
-
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('loginError').style.display = 'none';
-
-    console.log('Пользователь авторизован:', { name: data.name, role: data.role });
-
-    if (data.role === 'rop') {
-      showScreen('rop');
-      updateUrl('rop');
-      if (typeof initRopPanel === 'function') {
-        initRopPanel(supabaseClient, currentUserPhone, currentUserName);
-      } else {
-        alert('Ошибка: модуль РОПа не загружен.');
-      }
-    } 
-    else if (data.role === 'fin') {
-      showScreen('fin');
-      updateUrl('fin');
-      if (typeof initFinPanel === 'function') {
-        initFinPanel(supabaseClient, currentUserPhone, currentUserName);
-      } else {
-        alert('Ошибка: модуль финансиста не загружен.');
-      }
-    }
-    else if (data.role === 'gen') {
-      showScreen('gen');
-      updateUrl('gen');
-      if (typeof initGenPanel === 'function') {
-        initGenPanel(supabaseClient, currentUserPhone, currentUserName);
-      }
-    }
-    else {
-      // Обычный менеджер
-      showScreen('crm');
-      updateUrl('crm');
-    }
-  });
-
-  // 🔍 Проверка CRM ID — для менеджеров
+  // 🔍 Проверка CRM ID
   document.getElementById('checkCrmBtn').addEventListener('click', async () => {
     const crmId = document.getElementById('inputCrmId').value.trim();
     if (!crmId) {
@@ -225,229 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ➕ Форма создания — для менеджеров
-  function showCreateForm(crmId) {
-    showScreen('form');
-    updateUrl('form');
-    document.getElementById('formContainer').innerHTML = `
-      <button id="backBtn">← Назад к CRM ID</button>
-      <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
-      <label>Ваше имя (автоматически):</label>
-      <input type="text" id="manager_name" value="${currentUserName || ''}" readonly>
-      <label>Сумма договора (₽):</label>
-      <input type="number" id="contract_amount" placeholder="600000" required>
-      <label>Сумма предоплаты (₽):</label>
-      <input type="number" id="payment_amount" placeholder="140000" required>
-      <label>Тип сделки:</label>
-      <select id="deal_type">
-        <option value="to">ТО</option>
-        <option value="pto">ПТО</option>
-        <option value="comp">Комплектующие</option>
-        <option value="rep">Ремонты</option>
-        <option value="eq">Оборудование</option>
-        <option value="rent">Аренда</option>
-      </select>
-      <div id="arpuSection" style="display:none;">
-        <label>ARPU (₽/мес):</label>
-        <input type="number" id="arpu" placeholder="46666">
-      </div>
-      <div id="annualSection" style="display:none; margin-top:10px;">
-        <input type="checkbox" id="annual_contract">
-        <label for="annual_contract">Годовой контракт</label>
-      </div>
-      <div style="margin-top:15px;">
-        <input type="checkbox" id="is_first"> 
-        <label for="is_first">Первый платёж (ТО)?</label>
-      </div>
-      <div style="margin-top:10px;">
-        <input type="checkbox" id="paid"> 
-        <label for="paid">Оплачен?</label>
-      </div>
-      <div style="margin-top:10px;">
-        <input type="checkbox" id="up_signed"> 
-        <label for="up_signed">УПД подписан?</label>
-      </div>
-      <button id="createDealBtn" class="btn-success">Создать сделку</button>
-      <div id="createFormResult" class="result"></div>
-    `;
-
-    document.getElementById('deal_type').addEventListener('change', () => {
-      const isTO = document.getElementById('deal_type').value === 'to';
-      document.getElementById('arpuSection').style.display = isTO ? 'block' : 'none';
-      document.getElementById('annualSection').style.display = isTO ? 'block' : 'none';
-    });
-    document.getElementById('deal_type').dispatchEvent(new Event('change'));
-
-    document.getElementById('createDealBtn').addEventListener('click', async () => {
-      const managerName = document.getElementById('manager_name').value.trim();
-      const contractAmount = parseFloat(document.getElementById('contract_amount').value);
-      const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
-      const dealType = document.getElementById('deal_type').value;
-      const arpuInput = document.getElementById('arpu').value;
-      const annualContract = document.getElementById('annual_contract').checked;
-      const isFirst = document.getElementById('is_first').checked;
-      const paid = document.getElementById('paid').checked;
-      const upSigned = document.getElementById('up_signed').checked;
-
-      if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
-        alert('Заполните все поля');
-        return;
-      }
-
-      const totalPaid = paymentAmount;
-      const isFullyPaid = totalPaid >= contractAmount;
-      let bonusPaid = 0;
-
-      if (isFullyPaid) {
-        let revenueForBonus = contractAmount;
-        if (dealType === 'to') {
-          const arpuValue = arpuInput ? parseFloat(arpuInput) : contractAmount / 12;
-          revenueForBonus = arpuValue;
-        }
-        bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, annualContract);
-      }
-
-      const margin = 
-        dealType === 'to' || dealType === 'pto' || dealType === 'rent' ? contractAmount * 0.7 :
-        dealType === 'eq' ? contractAmount * 0.2 :
-        dealType === 'comp' ? contractAmount * 0.3 :
-        dealType === 'rep' ? contractAmount * 0.4 : 0;
-
-      const { error } = await supabaseClient
-        .from('deals')
-        .insert([{
-          crm_id: crmId,
-          manager_name: managerName,
-          deal_type: dealType,
-          contract_amount: contractAmount,
-          total_paid: totalPaid,
-          paid: isFullyPaid,
-          up_signed: upSigned,
-          is_first: isFirst,
-          arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
-          annual_contract: annualContract,
-          margin: margin,
-          bonus_paid: bonusPaid
-        }]);
-
-      if (error) {
-        alert('Ошибка: ' + error.message);
-        return;
-      }
-
-      document.getElementById('createFormResult').innerHTML = `
-        Сделка создана!<br>
-        Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}
-      `;
-      document.getElementById('createFormResult').style.display = 'block';
-    });
-  }
-
-  // 🔄 Форма обновления — для менеджеров
-  function showUpdateForm(deal) {
-    const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
-    const remaining = contract_amount - total_paid;
-
-    showScreen('form');
-    updateUrl('form');
-    document.getElementById('formContainer').innerHTML = `
-      <button id="backBtn">← Назад к CRM ID</button>
-      <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
-      <p><strong>Менеджер:</strong> ${manager_name}</p>
-      <p><strong>Тип:</strong> ${
-        deal_type === 'to' ? 'ТО' :
-        deal_type === 'pto' ? 'ПТО' :
-        deal_type === 'eq' ? 'Оборудование' :
-        deal_type === 'comp' ? 'Комплектующие' :
-        deal_type === 'rep' ? 'Ремонты' :
-        deal_type === 'rent' ? 'Аренда' : deal_type
-      }</p>
-      <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
-      <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
-      <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
-        <strong>Осталось оплатить:</strong> ${Math.max(0, remaining).toLocaleString('ru-RU')} ₽
-      </p>
-      <p><strong>УПД:</strong> ${up_signed ? '✅ Подписан' : '❌ Не подписан'}</p>
-      <p><strong>Статус оплаты:</strong> ${paid ? '✅ 100%' : '⏳ Частичная'}</p>
-
-      <label>Сумма нового платежа (₽):</label>
-      <input type="number" id="additional_payment" placeholder="Например: 100000" ${paid ? 'disabled' : ''}>
-
-      <div style="margin-top:15px;">
-        <input type="checkbox" id="update_up_signed" ${up_signed ? 'checked disabled' : ''}>
-        <label for="update_up_signed">Отметить УПД как подписанный</label>
-      </div>
-
-      <button id="updateDealBtn" class="btn-success">Обновить УПД</button>
-      <div id="updateFormResult" class="result"></div>
-    `;
-
-    document.getElementById('updateDealBtn').addEventListener('click', async () => {
-      const additionalPayment = parseFloat(document.getElementById('additional_payment')?.value || 0);
-      const newUpSigned = document.getElementById('update_up_signed').checked;
-
-      if (paid && up_signed === newUpSigned) {
-        alert('Нечего обновлять');
-        return;
-      }
-
-      if (!paid && (isNaN(additionalPayment) || additionalPayment <= 0)) {
-        alert('Введите корректную сумму платежа');
-        return;
-      }
-
-      let newTotalPaid = total_paid;
-      let newPaid = paid;
-      let bonusPaid = deal.bonus_paid || 0;
-
-      if (!paid) {
-        newTotalPaid += additionalPayment;
-        newPaid = newTotalPaid >= contract_amount;
-
-        if (newPaid && bonusPaid === 0) {
-          let revenueForBonus = contract_amount;
-          if (deal_type === 'to') {
-            const arpuValue = arpu_input || contract_amount / 12;
-            revenueForBonus = arpuValue;
-          }
-          bonusPaid = calculateBonus(deal_type, revenueForBonus, is_first, true, newUpSigned, annual_contract);
-        }
-      }
-
-      const { error } = await supabaseClient
-        .from('deals')
-        .update({
-          total_paid: newTotalPaid,
-          paid: newPaid,
-          up_signed: newUpSigned,
-          bonus_paid: bonusPaid,
-          updated_at: new Date().toISOString()
-        })
-        .eq('crm_id', crm_id);
-
-      if (error) {
-        alert('Ошибка: ' + error.message);
-        return;
-      }
-
-      document.getElementById('updateFormResult').innerHTML = `
-        Сделка обновлена!<br>
-        ${newPaid && bonusPaid > 0 ? `Начислена премия: ${bonusPaid.toLocaleString('ru-RU')} ₽` : 'Премия не начислена'}
-      `;
-      document.getElementById('updateFormResult').style.display = 'block';
-    });
-  }
-
-  // 🔙 Назад из формы
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'backBtn') {
-      document.getElementById('monthResult').style.display = 'none';
-      showScreen('crm');
-      updateUrl('crm');
-    }
-  });
-
-  // 📅 Премия за месяц (остальной код без изменений)
+  // 📅 Премия за месяц
   document.getElementById('checkMonthBtn').addEventListener('click', async () => {
     const { data: userData, error: userError } = await supabaseClient
       .from('allowed_users')
@@ -566,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </table>
       `;
 
+      // 💥 Турнирная таблица
       const ranking = await loadDepartmentRanking(now);
       if (ranking.length > 1) {
         let rankingHtml = `
@@ -604,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultDiv.style.display = 'block';
   });
 
-  // ✉️ Обратная связь (без изменений)
+  // ✉️ Обратная связь
   document.getElementById('feedbackBtn').addEventListener('click', () => {
     const form = document.getElementById('feedbackForm');
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
@@ -631,14 +425,244 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // ➕ Форма создания
+  function showCreateForm(crmId) {
+    showScreen('form');
+    updateUrl('form');
+    document.getElementById('formContainer').innerHTML = `
+      <button id="backBtn">← Назад к CRM ID</button>
+      <h3><i class="fas fa-plus-circle"></i> Создать сделку: ${crmId}</h3>
+      <label>Ваше имя (автоматически):</label>
+      <input type="text" id="manager_name" value="${currentUserName || ''}" readonly>
+      <label>Сумма договора (₽):</label>
+      <input type="number" id="contract_amount" placeholder="600000" required>
+      <label>Сумма предоплаты (₽):</label>
+      <input type="number" id="payment_amount" placeholder="140000" required>
+      <label>Тип сделки:</label>
+      <select id="deal_type">
+        <option value="to">ТО</option>
+        <option value="pto">ПТО</option>
+        <option value="comp">Комплектующие</option>
+        <option value="rep">Ремонты</option>
+        <option value="eq">Оборудование</option>
+        <option value="rent">Аренда</option>
+      </select>
+      <div id="arpuSection" style="display:none;">
+        <label>ARPU (₽/мес):</label>
+        <input type="number" id="arpu" placeholder="46666">
+      </div>
+      <div id="annualSection" style="display:none; margin-top:10px;">
+        <input type="checkbox" id="annual_contract">
+        <label for="annual_contract">Годовой контракт</label>
+      </div>
+      <div style="margin-top:15px;">
+        <input type="checkbox" id="is_first"> 
+        <label for="is_first">Первый платёж (ТО)?</label>
+      </div>
+      <div style="margin-top:10px;">
+        <input type="checkbox" id="paid"> 
+        <label for="paid">Оплачен?</label>
+      </div>
+      <div style="margin-top:10px;">
+        <input type="checkbox" id="up_signed"> 
+        <label for="up_signed">УПД подписан?</label>
+      </div>
+      <button id="createDealBtn" class="btn-success">Создать сделку</button>
+      <div id="createFormResult" class="result"></div>
+    `;
+
+    document.getElementById('deal_type').addEventListener('change', () => {
+      const isTO = document.getElementById('deal_type').value === 'to';
+      document.getElementById('arpuSection').style.display = isTO ? 'block' : 'none';
+      document.getElementById('annualSection').style.display = isTO ? 'block' : 'none';
+    });
+    document.getElementById('deal_type').dispatchEvent(new Event('change'));
+
+    document.getElementById('createDealBtn').addEventListener('click', async () => {
+      const managerName = document.getElementById('manager_name').value.trim();
+      const contractAmount = parseFloat(document.getElementById('contract_amount').value);
+      const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
+      const dealType = document.getElementById('deal_type').value;
+      const arpuInput = document.getElementById('arpu').value;
+      const annualContract = document.getElementById('annual_contract').checked;
+      const isFirst = document.getElementById('is_first').checked;
+      const paid = document.getElementById('paid').checked;
+      const upSigned = document.getElementById('up_signed').checked;
+
+      if (!managerName || isNaN(contractAmount) || isNaN(paymentAmount)) {
+        alert('Заполните все поля');
+        return;
+      }
+
+      const totalPaid = paymentAmount;
+      const isFullyPaid = totalPaid >= contractAmount;
+      let bonusPaid = 0;
+
+      if (isFullyPaid) {
+        let revenueForBonus = contractAmount;
+        if (dealType === 'to') {
+          const arpuValue = arpuInput ? parseFloat(arpuInput) : contractAmount / 12;
+          revenueForBonus = arpuValue;
+        }
+        bonusPaid = calculateBonus(dealType, revenueForBonus, isFirst, true, upSigned, annualContract);
+      }
+
+      const margin = 
+        dealType === 'to' || dealType === 'pto' || dealType === 'rent' ? contractAmount * 0.7 :
+        dealType === 'eq' ? contractAmount * 0.2 :
+        dealType === 'comp' ? contractAmount * 0.3 :
+        dealType === 'rep' ? contractAmount * 0.4 : 0;
+
+      const { error } = await supabaseClient
+        .from('deals')
+        .insert([{
+          crm_id: crmId,
+          manager_name: managerName,
+          deal_type: dealType,
+          contract_amount: contractAmount,
+          total_paid: totalPaid,
+          paid: isFullyPaid,
+          up_signed: upSigned,
+          is_first: isFirst,
+          arpu_input: dealType === 'to' ? (arpuInput ? parseFloat(arpuInput) : null) : null,
+          annual_contract: annualContract,
+          margin: margin,
+          bonus_paid: bonusPaid
+        }]);
+
+      if (error) {
+        alert('Ошибка: ' + error.message);
+        return;
+      }
+
+      document.getElementById('createFormResult').innerHTML = `
+        Сделка создана!<br>
+        Премия: ${bonusPaid > 0 ? bonusPaid.toLocaleString('ru-RU') + ' ₽' : 'не начислена'}
+      `;
+      document.getElementById('createFormResult').style.display = 'block';
+    });
+  }
+
+  // 🔄 Форма обновления
+  function showUpdateForm(deal) {
+    const { crm_id, contract_amount, total_paid, up_signed, paid, manager_name, deal_type, is_first, arpu_input, annual_contract } = deal;
+    const remaining = contract_amount - total_paid;
+
+    showScreen('form');
+    updateUrl('form');
+    document.getElementById('formContainer').innerHTML = `
+      <button id="backBtn">← Назад к CRM ID</button>
+      <h3><i class="fas fa-edit"></i> Обновить сделку: ${crm_id}</h3>
+      <p><strong>Менеджер:</strong> ${manager_name}</p>
+      <p><strong>Тип:</strong> ${
+        deal_type === 'to' ? 'ТО' :
+        deal_type === 'pto' ? 'ПТО' :
+        deal_type === 'eq' ? 'Оборудование' :
+        deal_type === 'comp' ? 'Комплектующие' :
+        deal_type === 'rep' ? 'Ремонты' :
+        deal_type === 'rent' ? 'Аренда' : deal_type
+      }</p>
+      <p><strong>Сумма договора:</strong> ${contract_amount.toLocaleString('ru-RU')} ₽</p>
+      <p><strong>Уже оплачено:</strong> ${total_paid.toLocaleString('ru-RU')} ₽</p>
+      <p style="color:${remaining <= 0 ? 'green' : 'orange'};">
+        <strong>Осталось оплатить:</strong> ${Math.max(0, remaining).toLocaleString('ru-RU')} ₽
+      </p>
+      <p><strong>УПД:</strong> ${up_signed ? '✅ Подписан' : '❌ Не подписан'}</p>
+      <p><strong>Статус оплаты:</strong> ${paid ? '✅ 100%' : '⏳ Частичная'}</p>
+
+      <label>Сумма нового платежа (₽):</label>
+      <input type="number" id="additional_payment" placeholder="Например: 100000" ${paid ? 'disabled' : ''}>
+
+      <div style="margin-top:15px;">
+        <input type="checkbox" id="update_up_signed" ${up_signed ? 'checked disabled' : ''}>
+        <label for="update_up_signed">Отметить УПД как подписанный</label>
+      </div>
+
+      <button id="updateDealBtn" class="btn-success">Обновить УПД</button>
+      <div id="updateFormResult" class="result"></div>
+    `;
+
+    document.getElementById('updateDealBtn').addEventListener('click', async () => {
+      const additionalPayment = parseFloat(document.getElementById('additional_payment')?.value || 0);
+      const newUpSigned = document.getElementById('update_up_signed').checked;
+
+      if (paid && up_signed === newUpSigned) {
+        alert('Нечего обновлять');
+        return;
+      }
+
+      if (!paid && (isNaN(additionalPayment) || additionalPayment <= 0)) {
+        alert('Введите корректную сумму платежа');
+        return;
+      }
+
+      let newTotalPaid = total_paid;
+      let newPaid = paid;
+      let bonusPaid = deal.bonus_paid || 0;
+
+      if (!paid) {
+        newTotalPaid += additionalPayment;
+        newPaid = newTotalPaid >= contract_amount;
+
+        if (newPaid && bonusPaid === 0) {
+          let revenueForBonus = contract_amount;
+          if (deal_type === 'to') {
+            const arpuValue = arpu_input || contract_amount / 12;
+            revenueForBonus = arpuValue;
+          }
+          bonusPaid = calculateBonus(deal_type, revenueForBonus, is_first, true, newUpSigned, annual_contract);
+        }
+      }
+
+      const { error } = await supabaseClient
+        .from('deals')
+        .update({
+          total_paid: newTotalPaid,
+          paid: newPaid,
+          up_signed: newUpSigned,
+          bonus_paid: bonusPaid,
+          updated_at: new Date().toISOString()
+        })
+        .eq('crm_id', crm_id);
+
+      if (error) {
+        alert('Ошибка: ' + error.message);
+        return;
+      }
+
+      document.getElementById('updateFormResult').innerHTML = `
+        Сделка обновлена!<br>
+        ${newPaid && bonusPaid > 0 ? `Начислена премия: ${bonusPaid.toLocaleString('ru-RU')} ₽` : 'Премия не начислена'}
+      `;
+      document.getElementById('updateFormResult').style.display = 'block';
+    });
+  }
+
+  // 🔙 Назад
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'backBtn') {
+      document.getElementById('monthResult').style.display = 'none';
+      showScreen('crm');
+      updateUrl('crm');
+    }
+  });
+
   // 🌐 Инициализация из URL
   const screenFromUrl = window.location.hash.replace('#', '') || 'login';
   showScreen(screenFromUrl);
 
+  // 🔙 Поддержка кнопки "Назад" в браузере
   window.addEventListener('popstate', (event) => {
     const screen = event.state?.screen || 'login';
     showScreen(screen);
   });
-  
-  console.log('app.js: Инициализация завершена');
 });
+
+
+
+
+
+
+
+
+
