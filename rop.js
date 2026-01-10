@@ -603,22 +603,42 @@ async function showRopUpdateForm(crmId) {
 }
 
 // Переход к панели финансиста
-function goToFinPanel() {
+async function goToFinPanel() {
   console.log('Переход к панели финансиста');
   
   document.getElementById('ropScreen').style.display = 'none';
   document.getElementById('finScreen').style.display = 'block';
   
+  // Проверяем, загружен ли модуль финансиста
   if (typeof initFinPanel === 'function') {
-    console.log('Вызов initFinPanel...');
-    initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName, 'ropScreen');
+    console.log('Модуль финансиста уже загружен, вызываем initFinPanel');
+    initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName);
   } else {
-    console.error('Функция initFinPanel не найдена!');
-    alert('Модуль финансиста не загружен. Проверьте консоль браузера.');
+    console.log('Модуль финансиста не загружен, загружаем fin.js...');
     
-    // Пробуем перезагрузить панель РОПа
-    document.getElementById('finScreen').style.display = 'none';
-    document.getElementById('ropScreen').style.display = 'block';
+    try {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'fin.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Не удалось загрузить fin.js'));
+        document.head.appendChild(script);
+      });
+      
+      if (typeof initFinPanel === 'function') {
+        console.log('fin.js загружен, вызываем initFinPanel');
+        initFinPanel(ropSupabaseClient, ropCurrentUserPhone, ropCurrentUserName);
+      } else {
+        throw new Error('Функция initFinPanel не найдена после загрузки fin.js');
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки панели финансиста:', error);
+      alert('Не удалось загрузить панель финансиста: ' + error.message);
+      
+      // Возвращаемся к РОПу
+      document.getElementById('finScreen').style.display = 'none';
+      document.getElementById('ropScreen').style.display = 'block';
+    }
   }
 }
 
