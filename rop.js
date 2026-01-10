@@ -35,24 +35,19 @@ function initRopPanel(supabaseClient, currentUserPhone, currentUserName) {
   loadRopData();
 }
 
-// Загрузка списка менеджеров
+// Загрузка списка менеджеров — ИСПРАВЛЕНО: из allowed_users
 async function loadManagerList() {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
   try {
+    // Загружаем ТОЛЬКО активных менеджеров из allowed_users
     const { data, error } = await ropSupabaseClient
-      .from('deals')
-      .select('manager_name')
-      .gte('created_at', startOfMonth.toISOString())
-      .lte('created_at', endOfMonth.toISOString());
+      .from('allowed_users')
+      .select('name')
+      .eq('role', 'manager')
+      .order('name');
 
     if (error) throw error;
 
-    const managerNames = [...new Set(
-      data.map(d => d.manager_name).filter(name => name && name.trim() !== '')
-    )];
+    const managerNames = data.map(user => user.name).filter(name => name && name.trim() !== '');
 
     const managerSelect = document.getElementById('ropManagerFilter');
     if (managerSelect) {
@@ -271,7 +266,7 @@ function addEditDealHandlers() {
   });
 }
 
-// ➕ Создание сделки от РОПа
+// ➕ Создание сделки от РОПа — ИСПРАВЛЕНО: убрано (РОП) из value
 async function showRopCreateForm() {
   console.log('Показать форму создания сделки');
   
@@ -321,6 +316,7 @@ async function showRopCreateForm() {
 
     let managerOptions = '';
     managers.forEach(user => {
+      // ✅ УБРАНО (РОП) из VALUE — только чистое имя
       managerOptions += `<option value="${user.name}">${user.name}${user.role === 'rop' ? ' (РОП)' : ''}</option>`;
     });
 
@@ -409,7 +405,7 @@ async function showRopCreateForm() {
 
     // Создание сделки
     document.getElementById('ropCreateDealBtnFinal').addEventListener('click', async () => {
-      const managerName = document.getElementById('ropManagerName').value;
+      const managerName = document.getElementById('ropManagerName').value; // ← ЧИСТОЕ ИМЯ!
       const contractAmount = parseFloat(document.getElementById('ropContractAmount').value);
       const paymentAmount = parseFloat(document.getElementById('ropPaymentAmount').value);
       const dealType = document.getElementById('ropDealType').value;
@@ -448,7 +444,7 @@ async function showRopCreateForm() {
           .from('deals')
           .insert([{
             crm_id: crmId,
-            manager_name: managerName,
+            manager_name: managerName, // ← ЧИСТОЕ ИМЯ!
             deal_type: dealType,
             contract_amount: contractAmount,
             total_paid: paymentAmount,
