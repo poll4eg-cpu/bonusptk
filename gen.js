@@ -1,4 +1,4 @@
-// gen.js — панель генерального директора (исправленная версия)
+// gen.js — панель генерального директора (полностью исправленная)
 let revenueChart = null;
 let segmentChart = null;
 let genSupabaseClient = null;
@@ -59,8 +59,8 @@ function addFilters() {
   
   filterContainer.innerHTML = `
     <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold;">Сегмент:</label>
-      <select id="genSegmentFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd; min-width:150px;">
+      <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Сегмент:</label>
+      <select id="genSegmentFilter" style="padding:8px 12px; border-radius:4px; border:1px solid #ddd; min-width:150px; background:white; font-size:14px;">
         <option value="">Все сегменты</option>
         <option value="to">ТО</option>
         <option value="pto">ПТО</option>
@@ -71,14 +71,14 @@ function addFilters() {
       </select>
     </div>
     <div>
-      <label style="display:block; margin-bottom:5px; font-weight:bold;">Менеджер:</label>
-      <select id="genManagerFilter" style="padding:8px; border-radius:4px; border:1px solid #ddd; min-width:150px;">
+      <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Менеджер:</label>
+      <select id="genManagerFilter" style="padding:8px 12px; border-radius:4px; border:1px solid #ddd; min-width:150px; background:white; font-size:14px;">
         <option value="">Все менеджеры</option>
         <!-- Список загрузится динамически -->
       </select>
     </div>
     <div>
-      <button id="resetFilters" style="padding:8px 16px; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer;">
+      <button id="resetFilters" style="padding:8px 16px; background:#1890ff; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">
         Сбросить фильтры
       </button>
     </div>
@@ -255,8 +255,9 @@ async function loadGenData() {
     const theoreticalMarginPercent = totalRevenue > 0 ? ((totalTheoreticalMargin / totalRevenue) * 100) : 0;
     const avgDealSize = totalDeals > 0 ? totalRevenue / totalDeals : 0;
     
-    // Обновляем KPI блоки
-    updateKPIBlocks(totalRevenue, totalActualMargin, actualMarginPercent, totalDeals, avgDealSize, totalTheoreticalMargin, theoreticalMarginPercent, totalExpenses);
+    // ✅ ИСПРАВЛЕНО: Обновляем ВСЕ KPI блоки
+    updateAllKPIBlocks(totalRevenue, totalActualMargin, actualMarginPercent, totalDeals, 
+                      avgDealSize, totalTheoreticalMargin, theoreticalMarginPercent, totalExpenses);
     
     // Рендерим графики
     renderCharts(weeklyData, segmentData);
@@ -301,87 +302,105 @@ function calculateTheoreticalMargin(dealType, amount) {
 }
 
 function showLoadingState() {
-  document.getElementById('totalRevenue').textContent = 'Загрузка...';
-  document.getElementById('totalMargin').textContent = 'Загрузка...';
-  document.getElementById('marginPercent').textContent = '...';
-  document.getElementById('totalDeals').textContent = '...';
+  const kpiBlocks = document.querySelectorAll('#genScreen [id^="total"], #genScreen [id*="Percent"]');
+  kpiBlocks.forEach(block => {
+    block.textContent = '...';
+  });
 }
 
-// Обновление KPI блоков
-function updateKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
-  // Основные KPI (фактические значения)
+// ✅ ИСПРАВЛЕНО: Обновление ВСЕХ KPI блоков
+function updateAllKPIBlocks(revenue, actualMargin, actualMarginPercent, deals, avgDeal, theoreticalMargin, theoreticalMarginPercent, expenses) {
+  // Основные KPI (уже существующие в HTML)
   document.getElementById('totalRevenue').textContent = formatCurrency(revenue);
   document.getElementById('totalMargin').textContent = formatCurrency(actualMargin);
   document.getElementById('marginPercent').textContent = actualMarginPercent.toFixed(1) + '%';
   document.getElementById('totalDeals').textContent = deals;
   
-  // Создаем или обновляем дополнительные KPI блоки
-  let kpiContainer = document.querySelector('.kpi-container');
-  if (!kpiContainer) {
-    kpiContainer = document.createElement('div');
-    kpiContainer.className = 'kpi-container';
-    kpiContainer.style.cssText = `
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      margin: 20px 0;
-    `;
-    
-    const existingKPIs = document.querySelector('#genScreen .card > div:first-child');
-    if (existingKPIs) {
-      existingKPIs.parentNode.insertBefore(kpiContainer, existingKPIs.nextSibling);
-    }
+  // ✅ ДОБАВЛЯЕМ НОВЫЕ KPI БЛОКИ
+  const kpiContainer = document.querySelector('.kpi-container');
+  if (kpiContainer) {
+    kpiContainer.remove(); // Удаляем старый контейнер
   }
   
-  // Дополнительные KPI
-  kpiContainer.innerHTML = `
-    <div style="background:#e6f7ff; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #91d5ff;">
-      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:16px;">📊 Теор. маржа</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#1890ff;">
+  // Создаем новый контейнер для KPI
+  const newKpiContainer = document.createElement('div');
+  newKpiContainer.className = 'kpi-container';
+  newKpiContainer.style.cssText = `
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+    width: 100%;
+  `;
+  
+  // HTML для всех KPI блоков
+  newKpiContainer.innerHTML = `
+    <div style="background:#e6f7ff; padding:15px; border-radius:8px; border:1px solid #91d5ff; min-height:100px;">
+      <h3 style="margin:0 0 10px 0; color:#1890ff; font-size:14px;">📊 Теоретическая маржа</h3>
+      <p style="font-size:20px; margin:0; font-weight:bold; color:#1890ff;">
         ${formatCurrency(theoreticalMargin)}
       </p>
       <small style="color:#1890ff; font-weight:bold;">${theoreticalMarginPercent.toFixed(1)}%</small>
     </div>
-    <div style="background:#f6ffed; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #b7eb8f;">
-      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:16px;">💰 Средний чек</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#52c41a;">
+    
+    <div style="background:#f6ffed; padding:15px; border-radius:8px; border:1px solid #b7eb8f; min-height:100px;">
+      <h3 style="margin:0 0 10px 0; color:#52c41a; font-size:14px;">💰 Средний чек</h3>
+      <p style="font-size:20px; margin:0; font-weight:bold; color:#52c41a;">
         ${formatCurrency(avgDeal)}
       </p>
       <small style="color:#52c41a;">на сделку</small>
     </div>
-    <div style="background:#fff1f0; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffa39e;">
-      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:16px;">💸 Расходы</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#ff4d4f;">
+    
+    <div style="background:#fff1f0; padding:15px; border-radius:8px; border:1px solid #ffa39e; min-height:100px;">
+      <h3 style="margin:0 0 10px 0; color:#ff4d4f; font-size:14px;">💸 Общие расходы</h3>
+      <p style="font-size:20px; margin:0; font-weight:bold; color:#ff4d4f;">
         ${formatCurrency(expenses)}
       </p>
       <small style="color:#ff4d4f;">всего</small>
     </div>
-    <div style="background:#fffbe6; padding:15px; border-radius:8px; min-width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border:1px solid #ffe58f;">
-      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:16px;">📈 Рентабельность</h3>
-      <p style="font-size:22px; margin:0; font-weight:bold; color:#faad14;">
+    
+    <div style="background:#fffbe6; padding:15px; border-radius:8px; border:1px solid #ffe58f; min-height:100px;">
+      <h3 style="margin:0 0 10px 0; color:#faad14; font-size:14px;">📈 Рентабельность</h3>
+      <p style="font-size:20px; margin:0; font-weight:bold; color:#faad14;">
         ${actualMarginPercent.toFixed(1)}%
       </p>
       <small style="color:#faad14;">фактическая</small>
     </div>
   `;
+  
+  // Вставляем после существующих KPI
+  const existingKpis = document.querySelector('#genScreen .card > div:first-child');
+  if (existingKpis) {
+    existingKpis.parentNode.insertBefore(newKpiContainer, existingKpis.nextSibling);
+  }
 }
 
-// Рендер графиков
+// ✅ ИСПРАВЛЕНО: Рендер графиков с адаптивностью
 function renderCharts(weeklyData, segmentData) {
-  const ctx1 = document.getElementById('revenueChart').getContext('2d');
-  
+  // Удаляем старые графики
   if (revenueChart) revenueChart.destroy();
   if (segmentChart) segmentChart.destroy();
-
-  // ✅ График 1: Динамика по неделям - ФИКСИРОВАННЫЙ РАЗМЕР
+  
+  // Получаем размер экрана для адаптивности
+  const screenWidth = window.innerWidth;
+  const isMobile = screenWidth < 768;
+  const isTablet = screenWidth >= 768 && screenWidth < 1024;
+  
+  // ✅ График 1: Динамика по неделям
+  const ctx1 = document.getElementById('revenueChart').getContext('2d');
   const labels = Object.keys(weeklyData).sort();
   const revenueData = labels.map(w => weeklyData[w].revenue);
   const theoreticalMarginData = labels.map(w => weeklyData[w].theoreticalMargin);
   const actualMarginData = labels.map(w => weeklyData[w].actualMargin);
-
-  // Создаем контейнер для первого графика с фиксированной высотой
-  let chart1Container = document.getElementById('revenueChart').parentNode;
-  chart1Container.style.height = '300px'; // Фиксированная высота
+  
+  // Настраиваем контейнер для первого графика
+  const chart1Container = document.getElementById('revenueChart').parentNode;
+  chart1Container.style.cssText = `
+    position: relative;
+    height: ${isMobile ? '250px' : '300px'};
+    width: 100%;
+    margin-bottom: ${isMobile ? '20px' : '30px'};
+  `;
   
   revenueChart = new Chart(ctx1, {
     type: 'line',
@@ -420,14 +439,15 @@ function renderCharts(weeklyData, segmentData) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false, // Важно для фиксированной высоты
+      maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top',
+          position: isMobile ? 'bottom' : 'top',
           labels: {
             font: {
-              size: 11
-            }
+              size: isMobile ? 10 : 11
+            },
+            padding: isMobile ? 10 : 15
           }
         },
         tooltip: {
@@ -446,22 +466,29 @@ function renderCharts(weeklyData, segmentData) {
               return formatCurrency(value, true);
             },
             font: {
-              size: 10
+              size: isMobile ? 9 : 10
             }
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.05)'
           }
         },
         x: {
           ticks: {
             font: {
-              size: 10
-            }
+              size: isMobile ? 9 : 10
+            },
+            maxRotation: isMobile ? 45 : 0
+          },
+          grid: {
+            color: 'rgba(0,0,0,0.05)'
           }
         }
       }
     }
   });
-
-  // ✅ График 2: Распределение по сегментам - МАЛЕНЬКИЙ
+  
+  // ✅ График 2: Распределение по сегментам (на 30% больше)
   let segmentCanvas = document.getElementById('segmentChart');
   if (!segmentCanvas) {
     const chartContainer = document.querySelector('#revenueChart').parentNode.parentNode;
@@ -469,18 +496,30 @@ function renderCharts(weeklyData, segmentData) {
     // Создаем контейнер для второго графика
     const segmentContainer = document.createElement('div');
     segmentContainer.style.cssText = `
-      margin-top: 20px;
+      margin-top: ${isMobile ? '15px' : '20px'};
       width: 100%;
-      height: 200px; // ✅ Маленькая высота
+      height: ${isMobile ? '250px' : '350px'}; /* ✅ На 30% больше чем было */
       position: relative;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #eee;
     `;
     
-    segmentContainer.innerHTML = '<h3 style="margin-bottom:10px; font-size:14px;">Распределение по сегментам</h3>';
+    segmentContainer.innerHTML = `
+      <h3 style="margin:0 0 10px 0; font-size:${isMobile ? '14px' : '16px'}; color:#333;">
+        📊 Распределение по сегментам
+      </h3>
+      <div style="position:relative; height:calc(100% - 30px);">
+        <canvas id="segmentChart"></canvas>
+      </div>
+    `;
     
-    segmentCanvas = document.createElement('canvas');
-    segmentCanvas.id = 'segmentChart';
-    segmentContainer.appendChild(segmentCanvas);
-    chartContainer.appendChild(segmentContainer);
+    // Вставляем после первого графика
+    const firstChartContainer = document.querySelector('#revenueChart').parentNode;
+    firstChartContainer.parentNode.insertBefore(segmentContainer, firstChartContainer.nextSibling);
+    
+    segmentCanvas = document.getElementById('segmentChart');
   }
   
   const segmentLabels = Object.keys(segmentData);
@@ -497,7 +536,8 @@ function renderCharts(weeklyData, segmentData) {
             '#1890ff', '#52c41a', '#faad14', '#eb2f96',
             '#722ed1', '#13c2c2', '#f759ab', '#ff7a45'
           ],
-          borderWidth: 1
+          borderWidth: 1,
+          borderColor: 'white'
         }]
       },
       options: {
@@ -505,22 +545,45 @@ function renderCharts(weeklyData, segmentData) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'right',
+            position: isMobile ? 'bottom' : 'right',
             labels: {
-              boxWidth: 10,
+              boxWidth: isMobile ? 8 : 10,
               font: {
-                size: 9 // ✅ Очень маленький шрифт
+                size: isMobile ? 9 : 11 // ✅ Увеличили шрифт
               },
-              padding: 8
+              padding: isMobile ? 12 : 15
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = segmentRevenue.reduce((a, b) => a + b, 0);
+                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                return `${context.label}: ${formatCurrency(context.raw)} (${percentage}%)`;
+              }
             }
           }
         },
-        cutout: '60%' // ✅ Тонкий пончик
+        cutout: '50%'
       }
     });
   } else {
-    segmentCanvas.parentNode.innerHTML = '<p style="text-align:center; color:#666; padding:20px; font-size:12px;">Нет данных для графика сегментов</p>';
+    segmentCanvas.parentNode.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#666; font-size:14px;">
+        Нет данных для графика сегментов
+      </div>
+    `;
   }
+  
+  // ✅ Адаптация на изменение размера окна
+  window.addEventListener('resize', function() {
+    if (revenueChart) {
+      revenueChart.resize();
+    }
+    if (segmentChart) {
+      segmentChart.resize();
+    }
+  });
 }
 
 // Показать аналитику
@@ -532,36 +595,42 @@ function showAnalytics(topDeals, topManagers, segmentData) {
     analyticsDiv.style.cssText = `
       margin-top: 30px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      width: 100%;
     `;
     document.querySelector('#genScreen .card').appendChild(analyticsDiv);
   }
   
-  // Топ сделок
+  // Адаптивность для мобильных
+  const screenWidth = window.innerWidth;
+  const isMobile = screenWidth < 768;
+  
   analyticsDiv.innerHTML = `
-    <div style="background:white; padding:12px; border-radius:6px; border:1px solid #eee; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-      <h3 style="margin-top:0; margin-bottom:10px; font-size:14px; color:#1890ff;">🏆 Топ-10 сделок по марже</h3>
-      <div style="max-height:250px; overflow-y:auto; font-size:12px;">
-        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+    <div style="background:white; padding:${isMobile ? '12px' : '15px'}; border-radius:8px; border:1px solid #eee; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+      <h3 style="margin-top:0; margin-bottom:${isMobile ? '10px' : '15px'}; font-size:${isMobile ? '14px' : '16px'}; color:#1890ff;">
+        🏆 Топ-10 сделок по марже
+      </h3>
+      <div style="max-height:300px; overflow-y:auto;">
+        <table style="width:100%; font-size:${isMobile ? '11px' : '13px'}; border-collapse:collapse;">
           <thead>
             <tr style="background:#fafafa;">
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">CRM ID</th>
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Сумма</th>
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Факт. маржа</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">CRM ID</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">Сумма</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">Факт. маржа</th>
             </tr>
           </thead>
           <tbody>
             ${topDeals.map(deal => `
               <tr>
-                <td style="padding:6px; border-bottom:1px solid #eee;">
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee;">
                   <div><strong>${deal.crm_id}</strong></div>
-                  <div style="font-size:10px; color:#666;">${deal.manager}</div>
+                  <div style="font-size:${isMobile ? '9px' : '10px'}; color:#666;">${deal.manager}</div>
                 </td>
-                <td style="padding:6px; border-bottom:1px solid #eee;">${formatCurrency(deal.amount, true)}</td>
-                <td style="padding:6px; border-bottom:1px solid #eee; color:${deal.marginPercent > 20 ? '#52c41a' : deal.marginPercent > 0 ? '#faad14' : '#ff4d4f'}">
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee;">${formatCurrency(deal.amount, true)}</td>
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee; color:${deal.marginPercent > 20 ? '#52c41a' : deal.marginPercent > 0 ? '#faad14' : '#ff4d4f'}">
                   ${formatCurrency(deal.actualMargin, true)}<br>
-                  <small style="font-size:10px;">${deal.marginPercent.toFixed(1)}%</small>
+                  <small style="font-size:${isMobile ? '9px' : '10px'};">${deal.marginPercent.toFixed(1)}%</small>
                 </td>
               </tr>
             `).join('')}
@@ -570,28 +639,30 @@ function showAnalytics(topDeals, topManagers, segmentData) {
       </div>
     </div>
     
-    <div style="background:white; padding:12px; border-radius:6px; border:1px solid #eee; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-      <h3 style="margin-top:0; margin-bottom:10px; font-size:14px; color:#1890ff;">👥 Топ-5 менеджеров</h3>
-      <div style="max-height:250px; overflow-y:auto; font-size:12px;">
-        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+    <div style="background:white; padding:${isMobile ? '12px' : '15px'}; border-radius:8px; border:1px solid #eee; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+      <h3 style="margin-top:0; margin-bottom:${isMobile ? '10px' : '15px'}; font-size:${isMobile ? '14px' : '16px'}; color:#1890ff;">
+        👥 Топ-5 менеджеров
+      </h3>
+      <div style="max-height:300px; overflow-y:auto;">
+        <table style="width:100%; font-size:${isMobile ? '11px' : '13px'}; border-collapse:collapse;">
           <thead>
             <tr style="background:#fafafa;">
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Менеджер</th>
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Выручка</th>
-              <th style="padding:6px; text-align:left; border-bottom:1px solid #eee;">Рентаб.</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">Менеджер</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">Выручка</th>
+              <th style="padding:${isMobile ? '4px 6px' : '6px 8px'}; text-align:left; border-bottom:1px solid #eee;">Рентаб.</th>
             </tr>
           </thead>
           <tbody>
             ${topManagers.map(manager => `
               <tr>
-                <td style="padding:6px; border-bottom:1px solid #eee;">
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee;">
                   <strong>${manager.name}</strong><br>
-                  <small style="font-size:10px; color:#666;">${manager.deals} сделок</small>
+                  <small style="font-size:${isMobile ? '9px' : '10px'}; color:#666;">${manager.deals} сделок</small>
                 </td>
-                <td style="padding:6px; border-bottom:1px solid #eee;">${formatCurrency(manager.revenue, true)}</td>
-                <td style="padding:6px; border-bottom:1px solid #eee; color:${manager.profitability > 20 ? '#52c41a' : manager.profitability > 0 ? '#faad14' : '#ff4d4f'}">
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee;">${formatCurrency(manager.revenue, true)}</td>
+                <td style="padding:${isMobile ? '4px 6px' : '6px 8px'}; border-bottom:1px solid #eee; color:${manager.profitability > 20 ? '#52c41a' : manager.profitability > 0 ? '#faad14' : '#ff4d4f'}">
                   ${manager.profitability.toFixed(1)}%<br>
-                  <small style="font-size:10px;">${formatCurrency(manager.actualMargin, true)}</small>
+                  <small style="font-size:${isMobile ? '9px' : '10px'};">${formatCurrency(manager.actualMargin, true)}</small>
                 </td>
               </tr>
             `).join('')}
@@ -605,7 +676,7 @@ function showAnalytics(topDeals, topManagers, segmentData) {
 // Заполняем список ВСЕХ менеджеров
 async function populateManagerFilter() {
   try {
-    // Загружаем ВСЕХ менеджеров (ограничиваем последними 1000 сделок для скорости)
+    // Загружаем ВСЕХ менеджеров
     const { data: allManagers, error } = await genSupabaseClient
       .from('deals')
       .select('manager_name')
@@ -637,24 +708,24 @@ function showAlerts(problemDeals, allDeals, expMap) {
   if (problemDeals.length > 0) {
     const alertEl = document.createElement('div');
     alertEl.style.cssText = `
-      padding: 10px;
+      padding: 12px;
       background: #fff2f0;
       border-left: 4px solid #ff4d4f;
       margin-bottom: 10px;
       border-radius: 4px;
-      font-size: 13px;
+      font-size: 14px;
     `;
     alertEl.innerHTML = `
       <strong style="color:#ff4d4f;">⚠️ Высокие расходы (>50%):</strong><br>
       <div style="margin-top:5px; max-height:150px; overflow-y:auto;">
         ${problemDeals.slice(0, 5).map(d => 
-          `<div style="margin-bottom:3px; padding:3px 0; border-bottom:1px dashed #ffccc7;">
+          `<div style="margin-bottom:5px; padding:5px 0; border-bottom:1px dashed #ffccc7;">
             <strong>${d.crm_id}</strong> (${d.manager}): 
             ${formatCurrency(d.amount, true)} → расходы ${formatCurrency(d.expenses, true)} (${d.expensePercent}%)<br>
-            <small style="color:#666;">Теор. маржа: ${formatCurrency(d.theoreticalMargin, true)} | Факт.: ${formatCurrency(d.actualMargin, true)}</small>
+            <small style="color:#666; font-size:12px;">Теор. маржа: ${formatCurrency(d.theoreticalMargin, true)} | Факт.: ${formatCurrency(d.actualMargin, true)}</small>
           </div>`
         ).join('')}
-        ${problemDeals.length > 5 ? `<div style="color:#666; font-size:11px;">... и ещё ${problemDeals.length - 5} сделок</div>` : ''}
+        ${problemDeals.length > 5 ? `<div style="color:#666; font-size:12px; margin-top:5px;">... и ещё ${problemDeals.length - 5} сделок</div>` : ''}
       </div>
     `;
     alertsDiv.appendChild(alertEl);
@@ -664,12 +735,12 @@ function showAlerts(problemDeals, allDeals, expMap) {
   if (alertsDiv.children.length === 1) {
     const noAlerts = document.createElement('div');
     noAlerts.style.cssText = `
-      padding: 15px;
+      padding: 20px;
       text-align: center;
       color: #666;
       background: #fafafa;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 14px;
     `;
     noAlerts.innerHTML = '✅ Все показатели в норме. Критических проблем не обнаружено.';
     alertsDiv.appendChild(noAlerts);
@@ -760,7 +831,7 @@ async function exportToExcel() {
       getSegmentLabel(deal.deal_type),
       deal.contract_amount,
       deal.total_paid,
-      calculateTheoreticalMargin(deal.deal_type, deal.contract_amount), // ✅ Рассчитываем теоретическую маржу
+      calculateTheoreticalMargin(deal.deal_type, deal.contract_amount),
       new Date(deal.created_at).toLocaleDateString('ru-RU')
     ]);
     
